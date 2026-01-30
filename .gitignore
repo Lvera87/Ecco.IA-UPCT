@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv_win/
+.env
+*.db
+*.sqlite
+.coverage
+htmlcov/
+
+# Node
+/node_modules
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/coverage
+
+# General
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+coverage/
+build/
+dist/
+# Copilot / AI agent instructions (keep out of commits if desired)
+.github/copilot-instructions.md

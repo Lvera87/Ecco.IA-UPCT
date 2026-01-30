@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Lato', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+  background-color: #f8fafc; /* Slate-50 default for light mode */
+}
+
+.dark body {
+  background-color: #0f172a; /* Slate-950 default for dark mode */
+}
+
+/* Custom Scrollbar for UPTC feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FDB913; /* UPTC Gold */
+}
+
+/* UPTC Specific Utilities */
+.uptc-header-gradient {
+  background: linear-gradient(90deg, #1A1A1A 0%, #333333 100%);
+}
+
+.uptc-gold-accent {
+  border-left: 4px solid #FDB913;
+}
