@@ -175,6 +175,51 @@ class GeminiService:
         except Exception:
             return {"summary": "Error en fallback", "critical_level": "medium", "recommendations": [], "ai_analysis": "No se pudo generar análisis."}
 
+    async def get_global_network_insights(self, campuses_summary: list) -> dict:
+        """
+        Analiza el estado agregado de TODAS las sedes y genera un resumen ejecutivo para el C-Level / Jefe de Infraestructura.
+        """
+        if not self.client:
+            return {
+                "executive_summary": "Resumen no disponible (IA desconectada).",
+                "global_status": "NORMAL",
+                "strategic_recommendation": "Verificar conexión de red."
+            }
+
+        prompt = f"""
+        Rol: Director de Infraestructura y Energía de la Universidad (UPTC).
+        Misión: Proveer un resumen ejecutivo del estado energético global de la red de campus.
+        
+        ESTADO ACTUAL DE LA RED (Datos Agregados):
+        {json.dumps(campuses_summary, indent=2)}
+        
+        INSTRUCCIONES:
+        1. Analiza la carga total proyectada vs la capacidad instalada (si no hay dato de capacidad, asume un margen seguro).
+        2. Genera un "Resumen Ejecutivo" de 2 frases, enfocado en Control Operativo y Costos.
+        3. Define el "Estado Global" (OPTIMAL, WARNING, CRITICAL).
+        4. Da 1 recomendación estratégica de alto nivel.
+        
+        FORMATO DE SALIDA (JSON):
+        {{
+            "executive_summary": "Texto profesional y directo.",
+            "global_status": "OPTIMAL / WARNING / CRITICAL",
+            "strategic_recommendation": "Acción clave para la semana."
+        }}
+        """
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+            import re
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            return {"executive_summary": "Error parseando respuesta IA.", "global_status": "WARNING"}
+        except Exception as e:
+            logger.error(f"Error in Gemini Global Insights: {e}")
+            return {"executive_summary": "Error en servicio de IA.", "global_status": "WARNING"}
+
     async def get_chat_response(self, message: str, context: dict, profile_type: str = "residential") -> dict:
         """
         Maneja una conversación fluida con el usuario inyectando contexto técnico.
