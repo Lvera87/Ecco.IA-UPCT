@@ -348,35 +348,36 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
           </div>
-        </div>
 
-        {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
-        <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
-          <div className="flex items-center justify-between pb-2">
-            <h2 className="text-white font-bold flex items-center gap-2">
-              <LayoutGrid size={20} className="text-emerald-500" />
-              Sedes Conectadas
-            </h2>
-            <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
+
+          {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
+          <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
+            <div className="flex items-center justify-between pb-2">
+              <h2 className="text-white font-bold flex items-center gap-2">
+                <LayoutGrid size={20} className="text-emerald-500" />
+                Sedes Conectadas
+              </h2>
+              <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+              {campuses.map(campus => (
+                <CampusNode
+                  key={campus.id}
+                  campus={campus}
+                  prediction={campusPredictions[campus.id]}
+                  onClick={() => navigate(`/campuses/${campus.id}`)}
+                />
+              ))}
+
+              {/* Add New Node Placeholder */}
+              <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                + Vincular Nueva Sede
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-            {campuses.map(campus => (
-              <CampusNode
-                key={campus.id}
-                campus={campus}
-                prediction={campusPredictions[campus.id]}
-                onClick={() => navigate(`/campuses/${campus.id}`)}
-              />
-            ))}
-
-            {/* Add New Node Placeholder */}
-            <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-              + Vincular Nueva Sede
-            </button>
-          </div>
         </div>
-
       </div>
     </div>
   );
