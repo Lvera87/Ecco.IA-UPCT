@@ -12,6 +12,7 @@ from app.schemas.campus import (
     ConsumptionRecord as ConsumptionSchema, ConsumptionRecordCreate
 )
 from app.services.gemini_service import gemini_service
+from app.services.prediction_service import prediction_service
 
 router = APIRouter(tags=["Campus Management"])
 
@@ -24,7 +25,8 @@ async def list_campuses(
 ):
     """List all campuses managed by the current user."""
     from sqlalchemy.orm import selectinload
-    query = select(Campus).where(Campus.user_id == current_user.id).options(selectinload(Campus.infrastructure))
+    # TODO: Implement RBAC. For now, we allow any authenticated user to view all campuses for the demo.
+    query = select(Campus).options(selectinload(Campus.infrastructure))
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -47,17 +49,17 @@ async def get_campus(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
-    """Get details of a specific campus."""
-    result = await db.execute(select(Campus).where(Campus.id == campus_id, Campus.user_id == current_user.id))
+    """Get a specific campus."""
+    from sqlalchemy.orm import selectinload
+    # DEMO MODE: For demonstration purposes, user_id is temporarily ignored for campus lookup.
+    query = select(Campus).where(Campus.id == campus_id).options(selectinload(Campus.infrastructure))
+    
+    result = await db.execute(query)
     campus = result.scalar_one_or_none()
-    if not campus: raise HTTPException(status_code=404, detail="Campus not found")
-    # Eagerly load infrastructure references if needed by schema (handled by ORM mostly)
-    # Ensure infrastructure is loaded if schema expects it. Pydantic's from_attributes=True handles lazy loading if session is open,
-    # but for async we might need select options joinedload.
-    # For now, let's rely on basic query execution.
-    # To fix missing relation in async:
-    # result = await db.execute(select(Campus).options(selectinload(Campus.infrastructure))...)
-    # Ideally standard scalars().all() works if no eager load is strictly enforced, but let's be safe later.
+    
+    if not campus:
+        raise HTTPException(status_code=404, detail="Campus not found")
+        
     return campus
 
 # --- INFRASTRUCTURE ENDPOINTS ---
@@ -144,7 +146,8 @@ async def analyze_campus(
 ):
     """Generate AI insights for a specific campus."""
     # 1. Fetch Campus Data
-    result = await db.execute(select(Campus).where(Campus.id == campus_id, Campus.user_id == current_user.id))
+    # 1. Fetch Campus Data (Demo mode: ignores user_id)
+    result = await db.execute(select(Campus).where(Campus.id == campus_id))
     campus = result.scalar_one_or_none()
     if not campus: raise HTTPException(status_code=404, detail="Campus not found")
     
@@ -173,3 +176,56 @@ async def analyze_campus(
     # 4. Call Gemini
     insights = await gemini_service.get_campus_insights(campus_context)
     return insights
+
+# --- PREDICTIONS & ML ---
+
+@router.get("/campuses/{campus_id}/predictions")
+async def get_campus_predictions(
+    campus_id: int,
+    days: int = 7,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Combina modelos Prophet de Miguel con Gemini para ofrecer proyecciones inteligentes.
+    """
+    # 1. Verificar existencia y obtener nombre para mapear modelo (Demo mode)
+    result = await db.execute(select(Campus).where(Campus.id == campus_id))
+    campus = result.scalar_one_or_none()
+    if not campus: 
+        raise HTTPException(status_code=404, detail="Sede no encontrada")
+
+    # 2. Mapear nombre de sede a código de modelo
+    name_map = {
+        "tunja": "tun",
+        "duitama": "dui",
+        "sogamoso": "sog",
+        "chiquinquira": "chi"
+    }
+    
+    # Intenta encontrar el código en el nombre o ciudad
+    campus_code = "tun" # Default fallback
+    found = False
+    search_text = (campus.name + " " + (campus.location_city or "")).lower()
+    
+    for name, code in name_map.items():
+        if name in search_text:
+            campus_code = code
+            found = True
+            break
+    
+    # 3. Obtener predicción de ML
+    ml_forecast = prediction_service.predict_campus_consumption(campus_code, days=days)
+    
+    if not ml_forecast:
+        return {"error": f"No hay modelos de ML disponibles para la sede {campus.name}"}
+
+    # 4. Obtener Insight de Gemini basado en la predicción
+    ai_insight = await gemini_service.get_prediction_insights(ml_forecast, campus.name)
+    
+    return {
+        "campus_id": campus_id,
+        "campus_name": campus.name,
+        "forecast": ml_forecast,
+        "ai_analysis": ai_insight
+    }

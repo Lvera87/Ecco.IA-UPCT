@@ -61,23 +61,24 @@ class GeminiService:
             return {}
 
         prompt = f"""
-        Eres un Consultor Senior en Sostenibilidad Universitaria y Eficiencia Energética para la UPTC.
-        Analiza los datos de la sede y detecta anomalías o oportunidades de ahorro.
-        Considera horarios de clases, laboratorios y áreas comunes.
+        Rol: Ingeniero Senior de Eficiencia Energética y Auditoría de Sostenibilidad para la UPTC.
+        Misión: Analizar técnicamente la infraestructura del campus para optimización de recursos.
         
-        CONTEXTO DEL CAMPUS:
+        CONTEXTO TÉCNICO DE LA SEDE:
         {json.dumps(campus_context, indent=2)}
         
-        FORMATO RELAJADO PERO TÉCNICO:
-        Detecta patrones como "consumo nocturno alto en laboratorios" o "picos inusuales en cafeterías".
+        INSTRUCCIONES DE ANÁLISIS:
+        1. Identifica ineficiencias críticas basándote en la relación Ocupación/Consumo.
+        2. Detecta anomalías operativas (ej. consumo base elevado en horarios no laborales).
+        3. Prioriza recomendaciones de alto impacto ROI (Retorno de Inversión).
         
-        FORMATO DE RESPUESTA (JSON PURO):
+        FORMATO DE SALIDA (JSON ESTRICTO):
         {{
-            "efficiency_score": int (0-100),
+            "efficiency_score": int (0-100, basado en benchmarks),
             "anomaly_detected": boolean,
-            "top_waste_reason": "string (ej. Iluminación canchas deportivas encendida en día)",
-            "ai_advice": "Consejo accionable para el administrador de infraestructura.",
-            "potential_savings_kwh": float
+            "top_waste_reason": "string (Técnico y específico, ej. 'Carga base térmica excesiva en Lab Q')",
+            "ai_advice": "Consejo técnico directo para Facility Management.",
+            "potential_savings_kwh": float (Estimación conservadora)
         }}
         """
         try:
@@ -93,6 +94,87 @@ class GeminiService:
         except Exception as e:
             logger.error(f"Error calling Gemini Campus: {e}")
             return {}
+    async def get_prediction_insights(self, predictions: dict, campus_name: str) -> dict:
+        """
+        Toma las predicciones matemáticas de ML y las traduce a lenguaje humano accionable con Gemini.
+        """
+        if not self.client:
+            return {"response": "IA no configurada para interpretar predicciones."}
+
+        prompt = f"""
+        Rol: Ingeniero de Datos Energéticos para Ecco-IA (Nivel Experto).
+        Objetivo: Interpretar modelos predictivos (Facebook Prophet / XGBoost) para toma de decisiones ejecutivas.
+        
+        SEDE: {campus_name}
+        TELEMETRÍA PREDICTIVA (Horizonte 7 H):
+        {json.dumps(predictions, indent=2)}
+        
+        INSTRUCCIONES:
+        1. Analiza la **Tendencia Central** y los **Intervalos de Confianza** (Incertidumbre).
+        2. Si el límite superior ('upper_bound') es alto, alerta sobre posibles picos de demanda.
+        3. Provee 3 estrategias de mitigación ingenieriles (Gestión de Demanda, Deslastre de Carga, etc.).
+        4. Usa lenguaje técnico, preciso y profesional (evita generalidades).
+        
+        FORMATO DEL REPORTE (JSON ESTRICTO):
+        {{
+            "summary": "Diagnóstico conciso de la tendencia y riesgo identificado (máx 1 frase)",
+            "critical_level": "low/medium/high (Basado en picos proyectados vs promedio)",
+            "recommendations": ["Estrategia 1 (Técnica)", "Estrategia 2 (Operativa)", "Estrategia 3 (Preventiva)"],
+            "ai_analysis": "Análisis profundo de la serie de tiempo. Menciona días críticos y volatilidad esperada."
+        }}
+        """
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+            import re
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            return {"summary": "Análisis generado", "ai_analysis": response.text}
+        except Exception as e:
+            logger.error(f"Error in Gemini Prediction Insights: {e}")
+            # FALLBACK: Generar respuesta básica sin IA
+            return self._generate_fallback_insights(predictions, campus_name)
+
+    def _generate_fallback_insights(self, predictions: dict, campus_name: str) -> dict:
+        """
+        Fallback cuando Gemini no está disponible.
+        Genera insights básicos analizando los números directamente.
+        """
+        try:
+            values = predictions.get("predictions", [])
+            if not values:
+                return {"summary": "Sin datos", "critical_level": "low", "recommendations": [], "ai_analysis": "No hay predicciones disponibles."}
+            
+            avg = sum(values) / len(values)
+            trend = "estable"
+            if len(values) >= 2:
+                if values[-1] > values[0] * 1.1:
+                    trend = "al alza"
+                elif values[-1] < values[0] * 0.9:
+                    trend = "a la baja"
+            
+            critical = "low"
+            if avg > 500:
+                critical = "high"
+            elif avg > 200:
+                critical = "medium"
+            
+            return {
+                "summary": f"Tendencia {trend} en {campus_name}. Promedio proyectado: {avg:.1f} kWh/día.",
+                "critical_level": critical,
+                "recommendations": [
+                    "Revisar horarios de iluminación en áreas comunes.",
+                    "Verificar equipos de climatización durante horas pico.",
+                    "Considerar auditoría energética en edificios críticos."
+                ],
+                "ai_analysis": f"Análisis automático (IA no disponible): Los modelos predicen un consumo promedio de {avg:.1f} kWh para los próximos días en {campus_name}. La tendencia es {trend}."
+            }
+        except Exception:
+            return {"summary": "Error en fallback", "critical_level": "medium", "recommendations": [], "ai_analysis": "No se pudo generar análisis."}
+
     async def get_chat_response(self, message: str, context: dict, profile_type: str = "residential") -> dict:
         """
         Maneja una conversación fluida con el usuario inyectando contexto técnico.

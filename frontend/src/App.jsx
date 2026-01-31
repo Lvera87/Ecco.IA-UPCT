@@ -26,6 +26,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/infrastructure-config" element={<InfrastructureConfig />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/campuses/:id" element={<CampusDashboard />} />
             <Route path="/energy-management" element={<EnergyManagement />} />
             <Route path="/appliances" element={<EnergyManagement />} />
             <Route path="/financial-impact" element={<EnergyManagement />} />
