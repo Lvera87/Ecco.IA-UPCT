@@ -5,6 +5,8 @@ import {
     Refrigerator, AirVent, Tv, WashingMachine, Microwave // Keeping some legacy icons just in case
 } from 'lucide-react';
 import { infrastructureApi } from '../api/infrastructure';
+import { analyticsApi } from '../api/analytics'; // Importar API de predicciones
+import { useUI } from './UIContext'; // Importar contexto UI para notificaciones
 
 const EnergyContext = createContext();
 
@@ -24,6 +26,9 @@ export const EnergyProvider = ({ children }) => {
     const [consumptionHistory, setConsumptionHistory] = useState([]);
     const [dashboardInsights, setDashboardInsights] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    
+    // Obtener acceso a notificaciones
+    const { addNotification } = useUI();
 
     useEffect(() => {
         localStorage.setItem('eccoIA_assets', JSON.stringify(assets));
@@ -38,9 +43,45 @@ export const EnergyProvider = ({ children }) => {
             ]);
 
             const firstCampusId = campuses.length > 0 ? campuses[0].id : null;
+            
+            // --- CARGA DE ACTIVOS ---
             const remoteAssets = firstCampusId
                 ? await infrastructureApi.getAssets(firstCampusId)
                 : [];
+                
+            // --- ANÁLISIS PROACTIVO (FACTOR WOW) ---
+            if (firstCampusId) {
+                // Consultar al "oráculo" (Prophet + XGBoost) en segundo plano
+                try {
+                    const predictions = await analyticsApi.getAnomalies(firstCampusId, 7, 'total');
+                    
+                    // Si detectamos anomalías en los datos del modelo, notificar inmediatamente
+                    if (predictions?.anomalies?.anomalies?.length > 0) {
+                        const count = predictions.anomalies.anomalies.length;
+                        addNotification({
+                            type: 'alert',
+                            title: 'Riesgo Predictivo Detectado',
+                            message: `Los modelos Prophet indican ${count} anomalías de consumo en los próximos 7 días para ${campuses[0].name}.`,
+                        });
+                    }
+                    
+                    // Análisis de eficiencia (XGBoost)
+                    const sectorAnalysis = await analyticsApi.getSectorAnalysis(firstCampusId);
+                    const inefficient = sectorAnalysis?.analysis?.inefficient_sectors || [];
+                    
+                    if (inefficient.length > 0) {
+                        const worst = inefficient[0];
+                        addNotification({
+                            type: 'tip',
+                            title: 'Oportunidad de Eficiencia',
+                            message: `El sector "${worst.name}" consume un ${worst.deviation_percent.toFixed(0)}% más de lo que predice el modelo XGBoost.`,
+                        });
+                    }
+                    
+                } catch (predError) {
+                    console.warn("Fallo en análisis proactivo:", predError);
+                }
+            }
 
             const metrics = dashboardData?.summary ? {
                 monthly_kwh: dashboardData.summary.monthly_consumption_kwh,

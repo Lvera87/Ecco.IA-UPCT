@@ -129,7 +129,7 @@ class PredictionService:
     def build_xgb_features(
         self,
         campus_code: str,
-        resource_type: str = "energia", # Nuevo parámetro para diferenciar
+        resource_type: str = "energia", 
         hora: int = 12,
         num_estudiantes: int = 5000,
         num_edificios: int = 10,
@@ -141,8 +141,17 @@ class PredictionService:
         en_periodo_academico: bool = True
     ) -> pd.DataFrame:
         """
-        Construye un DataFrame con las features específicas para cada modelo.
+        Construye un DataFrame con las features específicas.
+        Incluye SANITIZACIÓN de inputs para evitar valores físicos imposibles.
         """
+        # Sanitización (Edge Case Protection)
+        hora = max(0, min(23, hora))
+        num_estudiantes = max(0, num_estudiantes)
+        num_edificios = max(1, num_edificios) # Al menos 1 edificio
+        area_m2 = max(10.0, area_m2) # Área mínima
+        lag_1h = max(0.0, lag_1h)
+        lag_24h = max(0.0, lag_24h)
+        
         now = datetime.now()
         
         # Features comunes

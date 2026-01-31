@@ -313,6 +313,60 @@ async def generate_contextual_recommendations(
         "timestamp": datetime.now().isoformat()
     }
 
+from pydantic import BaseModel
+
+class ChatRequest(BaseModel):
+    message: str
+    campus_id: Optional[int] = None
+
+@router.post("/chat")
+async def chat_with_data(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Chatbot contextual que tiene acceso a los datos REALES del modelo.
+    """
+    # 1. Construir contexto técnico
+    context = {"user": current_user.full_name, "role": "Investigador"}
+    
+    if request.campus_id:
+        # Obtener datos frescos del modelo para el contexto
+        forecast = await get_model_consistent_data(request.campus_id, 7, db)
+        
+        # Obtener datos de eficiencia
+        infra_result = await db.execute(select(Infrastructure).where(Infrastructure.campus_id == request.campus_id))
+        infrastructure = infra_result.scalars().all()
+        campus_res = await db.execute(select(Campus).where(Campus.id == request.campus_id))
+        campus = campus_res.scalar_one_or_none()
+        
+        sectors_summary = []
+        if campus:
+             campus_code = get_campus_code(campus.name, campus.location_city)
+             for unit in infrastructure:
+                impact = prediction_service.predict_resource_impact(campus_code, area_m2=unit.area_sqm or 100)
+                sectors_summary.append({
+                    "name": unit.name,
+                    "type": unit.unit_type,
+                    "expected_kwh": impact.get('energy_prediction'),
+                    "actual_kwh": unit.avg_daily_consumption
+                })
+
+        context.update({
+            "campus": campus.name if campus else "Desconocido",
+            "forecast_next_7_days": [f"{d['date']}: {d['value']} kWh" for d in forecast[:3]], # Solo primeros 3 días para no saturar
+            "sector_efficiency": sectors_summary[:5]
+        })
+
+    # 2. Llamar a Gemini
+    response = await gemini_service.get_chat_response(
+        message=request.message,
+        context=context
+    )
+    
+    return response
+
 # Endpoints históricos/globales simplificados para usar la misma lógica...
 @router.get("/global/summary")
 async def get_global_analytics_summary(

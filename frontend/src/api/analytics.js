@@ -2,7 +2,7 @@
  * API para Analytics - Análisis Avanzado
  * Objetivos 2, 3, 4: Anomalías, Recomendaciones, XAI
  */
-import api from './axios';
+import api from './client'; // Corregido: Importar desde client.js
 
 export const analyticsApi = {
     /**
