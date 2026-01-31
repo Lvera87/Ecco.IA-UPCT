@@ -21,3 +21,5 @@ prophet
 pandas
 joblib
 scikit-learn
+numpy
+shap>=0.44.0
