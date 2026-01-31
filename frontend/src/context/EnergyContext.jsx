@@ -58,10 +58,15 @@ export const EnergyProvider = ({ children }) => {
             if (!targetId) return;
 
             // 2. Fetch specific campus data
-            const [campusAssets, dashboardData] = await Promise.all([
+            const [campusAssets, dashboardData, historyData] = await Promise.all([
                 infrastructureApi.getAssets(targetId),
-                infrastructureApi.getDashboardMetrics() // TODO: metrics should ideally be per campus too
+                infrastructureApi.getDashboardMetrics(), // TODO: metrics should ideally be per campus too
+                infrastructureApi.getConsumptionHistory(targetId)
             ]);
+
+            if (historyData) {
+                setConsumptionHistory(historyData);
+            }
 
             // Mocking different metrics per campus since the API might be global
             // In a real scenario, passing targetId to getDashboardMetrics would be better
@@ -69,6 +74,8 @@ export const EnergyProvider = ({ children }) => {
                 monthly_kwh: dashboardData.summary.monthly_consumption_kwh,
                 carbon_footprint_tons: dashboardData.summary.carbon_footprint_tons,
                 kwh_per_student: 120.5, // Mock
+                water_m3: 3500, // Mock Water Consumption
+                occupancy_rate: targetId === '1' ? 85 : 62, // Mock Occupancy (Tunja busy, others less)
                 efficiency_score: targetId === '2' ? 95 : 85, // Example variation
                 energy_intensity_index: 45.2
             } : {};

@@ -14,9 +14,7 @@ const InfrastructureSidebar = () => {
 
   const menuItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Control Sede" },
-    { to: "/sedes", icon: Building2, label: "Resumen Sedes" },
-    { to: "/energy-management", icon: Server, label: "Activos UPTC" },
-    { to: "/energy-analysis", icon: BarChart3, label: "Analítica" },
+    { to: "/sedes", icon: Building2, label: "Gestión & Analítica" },
     { to: "/carbon-footprint", icon: Wind, label: "Huella Carbono" },
     { to: "/infrastructure-assistant", icon: MessageSquareText, label: "Asistente IA" },
   ];

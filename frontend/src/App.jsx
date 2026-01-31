@@ -5,13 +5,13 @@ import Home from './pages/Home.jsx';
 import CampusDashboard from './pages/CampusDashboard.jsx';
 import Register from './pages/Register.jsx';
 import ResultsDashboard from './pages/ResultsDashboard.jsx';
-import EnergyAnalysis from './pages/EnergyAnalysis.jsx';
+
 import Dashboard from './pages/Dashboard.jsx';
 import EnergyManagement from './pages/EnergyManagement.jsx';
 import CarbonFootprint from './pages/CarbonFootprint.jsx';
 import DesignSystem from './pages/DesignSystem.jsx';
 import UserProfile from './pages/UserProfile.jsx';
-import AllCampusesSummary from './pages/AllCampusesSummary.jsx';
+import InfrastructureAnalytics from './pages/InfrastructureAnalytics.jsx';
 import Layout from './components/Layout.jsx';
 import InfrastructureConfig from './pages/InfrastructureConfig.jsx';
 import InfrastructureAssistant from './pages/InfrastructureAssistant.jsx';
@@ -30,13 +30,13 @@ function App() {
             <Route path="/energy-management" element={<EnergyManagement />} />
             <Route path="/appliances" element={<EnergyManagement />} />
             <Route path="/financial-impact" element={<EnergyManagement />} />
-            <Route path="/energy-analysis" element={<EnergyAnalysis />} />
+            <Route path="/energy-analysis" element={<InfrastructureAnalytics />} />
             <Route path="/carbon-footprint" element={<CarbonFootprint />} />
             <Route path="/infrastructure-assistant" element={<InfrastructureAssistant />} />
             <Route path="/results-dashboard" element={<ResultsDashboard />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/profile" element={<UserProfile />} />
-            <Route path="/sedes" element={<AllCampusesSummary />} />
+            <Route path="/sedes" element={<InfrastructureAnalytics />} />
             <Route path="/campus/:id" element={<CampusDashboard />} />
           </Routes>
         </Layout>

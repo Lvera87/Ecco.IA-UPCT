@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Building2, Users, GraduationCap, Activity, Zap,
   TrendingDown, Target, DollarSign, Server, Wind,
-  Lightbulb, AlertCircle, BarChart3, MapPin
+  Lightbulb, AlertCircle, BarChart3, MapPin, Droplets
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid
@@ -199,17 +199,17 @@ const Dashboard = () => {
                 color="slate"
               />
               <StatCard
-                title="Eficiencia/Estudiante"
-                value={formatNumber(metrics.kwh_per_student || 0, 2)}
-                unit="kWh/cap"
-                icon={Users}
-                color="yellow"
+                title="Consumo Agua"
+                value={formatNumber(metrics.water_m3 || 0)}
+                unit="m³"
+                icon={Droplets}
+                color="blue"
               />
               <StatCard
-                title="Activos Críticos"
-                value={assets.length || 0}
-                unit="Equipos"
-                icon={Server}
+                title="Ocupación Est."
+                value={`${metrics.occupancy_rate || 0}`}
+                unit="%"
+                icon={Users}
                 color="slate"
               />
             </div>
@@ -221,43 +221,7 @@ const Dashboard = () => {
               subtitle="Monitoreo en tiempo real de bloques y laboratorios."
             />
 
-            {/* Lista de Activos Institucionales */}
-            <Card className="p-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-display font-bold text-slate-900 dark:text-white flex items-center gap-2 text-lg">
-                  <Server size={20} className="text-uptc-gold" /> Inventario de Activos
-                </h3>
-              </div>
 
-              {assets.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {assets.map((asset) => (
-                    <div key={asset.id} className="p-4 rounded-lg border bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 hover:border-uptc-gold transition-all group">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="size-10 rounded-lg flex items-center justify-center bg-uptc-gold/10 text-uptc-gold">
-                          {asset.asset_type === 'lighting' ? <Lightbulb size={20} /> :
-                            asset.asset_type === 'hvac' ? <Wind size={20} /> :
-                              <Server size={20} />}
-                        </div>
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${asset.status ? 'bg-uptc-black text-uptc-gold' : 'bg-slate-200 text-slate-500'}`}>
-                          {asset.status ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </div>
-                      <div className="font-bold text-slate-800 dark:text-white truncate">{asset.name}</div>
-                      <div className="text-xs text-slate-500 mt-1">{asset.location || 'Sin ubicación'}</div>
-                      <div className="mt-3 text-sm font-mono text-slate-600 dark:text-slate-400">
-                        {formatNumber(asset.consumption || 0, 1)} kWh/día
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="Sin activos registrados"
-                  description="Registra transformadores, bloques o equipos mayores."
-                />
-              )}
-            </Card>
           </div>
 
           {/* Columna Derecha: Insights & Acciones */}

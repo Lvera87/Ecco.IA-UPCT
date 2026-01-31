@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Building2, Zap, Droplets, ArrowLeft, Activity, AlertTriangle } from 'lucide-react';
 import Card from '../components/ui/Card';
+import AnomaliesChart from '../components/dashboard/AnomaliesChart';
+import AnomaliesTable from '../components/dashboard/AnomaliesTable';
 // import { campusApi } from '../api/campus'; // Pending creation
 
 const CampusDashboard = () => {
@@ -77,12 +79,25 @@ const CampusDashboard = () => {
             <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Consumption Chart Area */}
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="bg-slate-900/50 border-slate-800 p-6 min-h-[300px]">
-                        <h3 className="font-bold text-white mb-4">Curva de Demanda Horaria</h3>
-                        <div className="flex items-center justify-center h-full text-slate-500">
-                            [Gráfico de Consumo Aquí]
-                        </div>
-                    </Card>
+                    {/* Gráfico de Anomalías */}
+                    <AnomaliesChart
+                        data={[
+                            { time: '06:00', value: 120 }, { time: '08:00', value: 340 },
+                            { time: '10:00', value: 410 }, { time: '12:00', value: 580 }, // Anomalía
+                            { time: '14:00', value: 460 }, { time: '16:00', value: 390 },
+                            { time: '18:00', value: 250 }, { time: '20:00', value: 180 }
+                        ]}
+                        baseline={campus.baseline}
+                    />
+
+                    {/* Tabla de Eventos */}
+                    <AnomaliesTable
+                        events={[
+                            { date: new Date().toISOString(), location: 'Bloque L (Laboratorios)', spaceType: 'Laboratorios', deviation: 25, severity: 'critical' },
+                            { date: new Date(Date.now() - 86400000).toISOString(), location: 'Edificio Admin', spaceType: 'Oficinas', deviation: 12, severity: 'medium' },
+                            { date: new Date(Date.now() - 172800000).toISOString(), location: 'Cafetería Central', spaceType: 'Servicios', deviation: 5, severity: 'low' }
+                        ]}
+                    />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {infrastructure.map(unit => (

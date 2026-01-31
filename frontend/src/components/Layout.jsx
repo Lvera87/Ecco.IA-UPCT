@@ -15,6 +15,8 @@ const Layout = ({ children }) => {
     '/infrastructure-assistant',
     '/profile',
     '/energy-management',
+    '/sedes',
+    '/campus'
   ];
 
   const isMatch = (routes) => {

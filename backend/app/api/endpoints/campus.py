@@ -173,3 +173,39 @@ async def analyze_campus(
     # 4. Call Gemini
     insights = await gemini_service.get_campus_insights(campus_context)
     return insights
+
+@router.get("/campuses/{campus_id}/consumption-history")
+async def get_consumption_history(
+    campus_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Get consumption history for a campus."""
+    # Verify campus ownership
+    result = await db.execute(select(Campus).where(Campus.id == campus_id, Campus.user_id == current_user.id))
+    campus = result.scalar_one_or_none()
+    if not campus: raise HTTPException(status_code=404, detail="Campus not found")
+
+    # Fetch real records from DB
+    query = select(ConsumptionRecord).where(
+        ConsumptionRecord.campus_id == campus_id
+    ).order_by(ConsumptionRecord.reading_date.desc()).limit(30)
+    
+    result = await db.execute(query)
+    db_records = result.scalars().all()
+    
+    if not db_records:
+        # Fallback if DB is empty for some reason, though we should have seeded
+        return []
+
+    # Format for frontend
+    records = []
+    for r in db_records:
+        records.append({
+            "date": r.reading_date.isoformat(),
+            "value": r.reading_value,
+            "unit": "kWh" if r.resource_type == 'electricity' else 'm3'
+        })
+    
+    # Reverse to show chronological order (oldest -> newest) for charts usually
+    return records[::-1]
