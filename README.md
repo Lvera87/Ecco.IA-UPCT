@@ -3,8 +3,6 @@
 ## 📄 Descripción del Proyecto
 > **Nota:** La información detallada del proyecto (contexto, objetivos y alcance) debe completarse con el contenido del documento de especificaciones.
 > 
-> [Insertar aquí la información del documento de Google Docs: https://docs.google.com/document/d/1qbnNP4R0tvGJS7drrBGjAot8FwMuPfka/edit?pli=1]
-
 Este proyecto es una plataforma integral diseñada para la gestión, monitoreo y análisis del consumo energético y la sostenibilidad en campus universitarios (basado en la estructura de la UPCT). Permite la visualización de datos en tiempo real, predicciones basadas en modelos de IA y control operativo.
 
 ---
