@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
+import DistributionDonut from './dashboard/DistributionDonut';
 
 const InfrastructureSidebar = () => {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ const InfrastructureSidebar = () => {
   };
 
   return (
-    <aside className="hidden md:flex flex-col w-72 bg-[#050a0a] text-slate-300 border-r border-slate-800 shadow-2xl z-30">
+    <aside className="hidden md:flex flex-col w-72 bg-[#050a0a] text-slate-300 border-r border-slate-800 shadow-2xl z-30 overflow-y-auto custom-scrollbar">
       {/* Header Institucional */}
       <div className="p-6 flex flex-col gap-6">
         <div className="flex items-center gap-3">
@@ -68,6 +69,11 @@ const InfrastructureSidebar = () => {
             )}
           </NavLink>
         ))}
+        
+        {/* Distribución por Sector (Widget Sidebar) */}
+        <div className="mt-8 border-t border-slate-800/50 pt-4">
+            <DistributionDonut />
+        </div>
       </nav>
 
       {/* Footer / Profile & Settings */}
