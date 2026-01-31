@@ -7,7 +7,7 @@ import Register from './pages/Register.jsx';
 import ResultsDashboard from './pages/ResultsDashboard.jsx';
 import EnergyAnalysis from './pages/EnergyAnalysis.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import EnergyManagement from './pages/EnergyManagement.jsx';
+
 import CarbonFootprint from './pages/CarbonFootprint.jsx';
 import DesignSystem from './pages/DesignSystem.jsx';
 import UserProfile from './pages/UserProfile.jsx';
@@ -27,9 +27,10 @@ function App() {
             <Route path="/infrastructure-config" element={<InfrastructureConfig />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/campuses/:id" element={<CampusDashboard />} />
-            <Route path="/energy-management" element={<EnergyManagement />} />
-            <Route path="/appliances" element={<EnergyManagement />} />
-            <Route path="/financial-impact" element={<EnergyManagement />} />
+            {/* <Route path="/energy-management" element={<EnergyManagement />} /> Removed */}
+            {/* <Route path="/appliances" element={<EnergyManagement />} /> Removed */}
+            {/* <Route path="/financial-impact" element={<EnergyManagement />} /> Removed */}
+
             <Route path="/energy-analysis" element={<EnergyAnalysis />} />
             <Route path="/carbon-footprint" element={<CarbonFootprint />} />
             <Route path="/infrastructure-assistant" element={<InfrastructureAssistant />} />

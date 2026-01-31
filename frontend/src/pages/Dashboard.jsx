@@ -116,7 +116,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [campuses, setCampuses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({ totalEnergy: 0, activeAlerts: 0, efficiency: 0 });
+  const [metrics, setMetrics] = useState({ totalEnergy: 0, activeAlerts: 0, efficiency: 0, population: 0 });
 
   // Estado para la gráfica agregada real
   const [globalChartData, setGlobalChartData] = useState([]);
@@ -176,10 +176,22 @@ const Dashboard = () => {
         const totalBaseline = campusesData.reduce((acc, c) => acc + (c.baseline_energy_kwh || 0), 0);
         const totalProjected = aggregatedChart.reduce((acc, curr) => acc + curr.value, 0);
 
+        // Calcular Alertas Reales: Sedes con status != 'online'
+        const activeAlertsCount = campusesData.filter(c => c.status && c.status !== 'online').length;
+
+        // Calcular Población Total Real
+        const totalPopulation = campusesData.reduce((acc, c) => acc + (c.population_students || 0), 0);
+
+        // Calcular Eficiencia (Simulada honestamente como relación Baseline vs Proyección si no hay dato real)
+        // Si Proyectado < Baseline = Eficiente.
+        const efficiencyScore = totalBaseline > 0 ? ((totalBaseline - totalProjected) / totalBaseline * 100) : 0;
+        const normalizedEfficiency = Math.min(Math.max(efficiencyScore + 100, 0), 100).toFixed(1); // 100% = baseline met exactly or better
+
         setMetrics({
-          totalEnergy: totalProjected || totalBaseline, // Fallback to baseline sum if no predictions
-          activeAlerts: 0, // Real alert logic needed here
-          efficiency: 0 // Real efficiency logic needed
+          totalEnergy: totalProjected || totalBaseline,
+          activeAlerts: activeAlertsCount,
+          efficiency: normalizedEfficiency,
+          population: totalPopulation
         });
 
       } catch (e) {
@@ -208,7 +220,7 @@ const Dashboard = () => {
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-emerald-900/10 rounded-full blur-[100px]" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.com/noise.svg')] opacity-20" />
+
       </div>
 
       {/* GLOBAL HEADER */}
@@ -241,12 +253,10 @@ const Dashboard = () => {
             <h2 className="text-3xl font-bold text-white mb-2">Resumen de Red</h2>
             <p className="text-slate-400 max-w-2xl">
               Visión global del rendimiento energético en {campuses.length} sedes universitarias.
-              El consumo actual se encuentra <span className="text-emerald-400 font-bold">dentro de los parámetros nominales</span>.
+              {metrics.activeAlerts > 0
+                ? <span className="text-amber-400 font-bold ml-1">Atención requerida en {metrics.activeAlerts} sedes.</span>
+                : <span className="text-emerald-400 font-bold ml-1">Operación nominal en toda la red.</span>}
             </p>
-          </div>
-          <div className="text-right hidden md:block">
-            <p className="text-sm text-slate-500 font-mono">TIEMPO DE EJECUCIÓN</p>
-            <p className="text-2xl font-bold text-white font-mono">14d 03h 22m</p>
           </div>
         </div>
 
@@ -270,11 +280,11 @@ const Dashboard = () => {
           />
           <GlobalMetric
             title="Ocupación Estimada"
-            value="12.4k"
+            value={(metrics.population || 0).toLocaleString()}
             unit="Personas"
             icon={Users}
             color="purple"
-            trend={+5.1}
+            trend={null}
           />
           <GlobalMetric
             title="Índice de Eficiencia"
@@ -290,7 +300,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-auto lg:h-[500px]">
 
           {/* LEFT: AGGREGATE CHART (Now on Left for emphasis/Dashboard look) */}
-          <div className="lg:col-span-2 bg-[#0a0f1e] border border-slate-800 rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+          <div className="lg:col-span-2 bg-[#0a0f1e] border border-slate-800 rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-colors min-h-[450px]">
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none opacity-50" />
 
             <div className="flex justify-between items-center mb-6 relative z-10">
@@ -307,7 +317,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="flex-1 w-full min-h-0 relative z-10">
+            <div className="flex-1 w-full relative z-10 min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={globalChartData}>
                   <defs>
@@ -338,35 +348,35 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
           </div>
+        </div>
 
-          {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
-          <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
-            <div className="flex items-center justify-between pb-2">
-              <h2 className="text-white font-bold flex items-center gap-2">
-                <LayoutGrid size={20} className="text-emerald-500" />
-                Sedes Conectadas
-              </h2>
-              <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-              {campuses.map(campus => (
-                <CampusNode
-                  key={campus.id}
-                  campus={campus}
-                  prediction={campusPredictions[campus.id]}
-                  onClick={() => navigate(`/campuses/${campus.id}`)}
-                />
-              ))}
-
-              {/* Add New Node Placeholder */}
-              <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                + Vincular Nueva Sede
-              </button>
-            </div>
+        {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
+        <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
+          <div className="flex items-center justify-between pb-2">
+            <h2 className="text-white font-bold flex items-center gap-2">
+              <LayoutGrid size={20} className="text-emerald-500" />
+              Sedes Conectadas
+            </h2>
+            <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
           </div>
 
+          <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+            {campuses.map(campus => (
+              <CampusNode
+                key={campus.id}
+                campus={campus}
+                prediction={campusPredictions[campus.id]}
+                onClick={() => navigate(`/campuses/${campus.id}`)}
+              />
+            ))}
+
+            {/* Add New Node Placeholder */}
+            <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+              + Vincular Nueva Sede
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
   );
