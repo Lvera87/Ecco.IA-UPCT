@@ -325,8 +325,8 @@ const Dashboard = () => {
                 Telemetría de Red Global
               </h3>
               <div className="flex gap-2">
-                {['1H', '24H', '7D', '30D'].map(range => (
-                  <button key={range} className={`px-3 py-1 rounded text-[10px] font-bold ${range === '24H' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                {['7 Días (Proyección)'].map(range => (
+                  <button key={range} className={`px-3 py-1 rounded text-[10px] font-bold bg-blue-600 text-white cursor-default`}>
                     {range}
                   </button>
                 ))}
