@@ -296,87 +296,82 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* MAIN SECTION: MAP & GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-auto lg:h-[500px]">
+        {/* SECTION 1: AGGREGATE CHART (Full Width) */}
+        <div className="bg-[#0a0f1e] border border-slate-800 rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none opacity-50" />
 
-          {/* LEFT: AGGREGATE CHART (Now on Left for emphasis/Dashboard look) */}
-          <div className="lg:col-span-2 bg-[#0a0f1e] border border-slate-800 rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-colors min-h-[450px]">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none opacity-50" />
-
-            <div className="flex justify-between items-center mb-6 relative z-10">
-              <h3 className="text-white text-lg font-bold flex items-center gap-3">
-                <Activity size={20} className="text-blue-500" />
-                Perfil de Carga Agregado (Control Operativo)
-              </h3>
-              <div className="flex gap-2">
-                {['Semana Operativa'].map(range => (
-                  <button key={range} className={`px-3 py-1 rounded text-[10px] font-bold bg-blue-600 text-white cursor-default`}>
-                    {range}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="w-full h-[350px] relative z-10">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={globalChartData}>
-                  <defs>
-                    <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} opacity={0.5} />
-                  <XAxis dataKey="time" hide />
-                  <YAxis orientation="right" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                    itemStyle={{ color: '#e2e8f0', fontSize: '12px' }}
-                    labelStyle={{ display: 'none' }}
-                    cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#3b82f6"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorGlobal)"
-                    isAnimationActive={true}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-
-          {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
-          <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
-            <div className="flex items-center justify-between pb-2">
-              <h2 className="text-white font-bold flex items-center gap-2">
-                <LayoutGrid size={20} className="text-emerald-500" />
-                Sedes Conectadas
-              </h2>
-              <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-              {campuses.map(campus => (
-                <CampusNode
-                  key={campus.id}
-                  campus={campus}
-                  prediction={campusPredictions[campus.id]}
-                  onClick={() => navigate(`/campuses/${campus.id}`)}
-                />
+          <div className="flex justify-between items-center mb-6 relative z-10">
+            <h3 className="text-white text-lg font-bold flex items-center gap-3">
+              <Activity size={20} className="text-blue-500" />
+              Perfil de Carga Agregado (Control Operativo)
+            </h3>
+            <div className="flex gap-2">
+              {['Semana Operativa'].map(range => (
+                <button key={range} className={`px-3 py-1 rounded text-[10px] font-bold bg-blue-600 text-white cursor-default`}>
+                  {range}
+                </button>
               ))}
-
-              {/* Add New Node Placeholder */}
-              <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                + Vincular Nueva Sede
-              </button>
             </div>
           </div>
 
+          <div className="w-full h-[350px] relative z-10">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={globalChartData}>
+                <defs>
+                  <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} opacity={0.5} />
+                <XAxis dataKey="time" hide />
+                <YAxis orientation="right" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0', fontSize: '12px' }}
+                  labelStyle={{ display: 'none' }}
+                  cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#3b82f6"
+                  strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#colorGlobal)"
+                  isAnimationActive={true}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* SECTION 2: CAMPUS GRID (Cards Layout) */}
+        <div>
+          <div className="flex items-center justify-between pb-6">
+            <h2 className="text-white text-xl font-bold flex items-center gap-2">
+              <LayoutGrid size={24} className="text-emerald-500" />
+              Panel de Control de Sedes
+            </h2>
+            <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {campuses.map(campus => (
+              <CampusNode
+                key={campus.id}
+                campus={campus}
+                prediction={campusPredictions[campus.id]}
+                onClick={() => navigate(`/campuses/${campus.id}`)}
+              />
+            ))}
+
+            {/* Add New Node Placeholder */}
+            <button className="h-full min-h-[200px] border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex flex-col items-center justify-center gap-2">
+              <span className="text-2xl">+</span>
+              Vincular Nueva Sede
+            </button>
+          </div>
         </div>
       </div>
     </div>
