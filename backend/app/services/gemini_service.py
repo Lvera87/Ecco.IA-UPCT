@@ -261,4 +261,183 @@ class GeminiService:
             logger.error(f"Error in Gemini Chat: {e}")
             return {"response": "Tuve un pequeño corto circuito mental. ¿Podrías repetir la pregunta?"}
 
+    async def get_sector_recommendations(self, sector_analysis: dict, anomalies: dict, campus_name: str) -> dict:
+        """
+        Genera recomendaciones ESPECÍFICAS y ACCIONABLES por sector.
+        Objetivo 3: Traducir predicciones y análisis en acciones concretas.
+        """
+        if not self.client:
+            return self._generate_fallback_sector_recommendations(sector_analysis, anomalies)
+
+        prompt = f"""
+        Rol: Ingeniero Senior de Eficiencia Energética especializado en Infraestructura Universitaria.
+        Misión: Generar recomendaciones ESPECÍFICAS, MEDIBLES y ACCIONABLES para cada sector ineficiente.
+        
+        SEDE ANALIZADA: {campus_name}
+        
+        ANÁLISIS DE EFICIENCIA POR SECTOR:
+        {json.dumps(sector_analysis, indent=2, default=str)}
+        
+        ANOMALÍAS DETECTADAS:
+        {json.dumps(anomalies, indent=2, default=str)}
+        
+        INSTRUCCIONES CRÍTICAS:
+        1. Para CADA sector ineficiente, genera UNA recomendación específica.
+        2. Cada recomendación DEBE incluir:
+           - Acción concreta (qué hacer exactamente)
+           - Responsable sugerido (Facility Management, Mantenimiento, etc.)
+           - Plazo recomendado (Inmediato, 1 semana, 1 mes)
+           - Ahorro estimado en % o kWh
+        3. Prioriza acciones de BAJO COSTO y ALTO IMPACTO.
+        4. Si hay consumo fuera de horario, incluye recomendación de automatización.
+        5. Usa lenguaje técnico pero comprensible.
+        
+        FORMATO DE SALIDA (JSON ESTRICTO):
+        {{
+            "sector_recommendations": [
+                {{
+                    "sector": "Nombre del sector",
+                    "problema": "Descripción técnica del problema",
+                    "accion": "Acción específica a tomar",
+                    "responsable": "Área responsable",
+                    "plazo": "Inmediato/Corto/Mediano",
+                    "ahorro_estimado": "X% o X kWh/mes",
+                    "inversion_requerida": "Baja/Media/Alta",
+                    "roi_estimado": "X meses"
+                }}
+            ],
+            "quick_wins": ["Acción inmediata 1", "Acción inmediata 2"],
+            "resumen_ejecutivo": "Frase resumen para gerencia"
+        }}
+        """
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+            import re
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            return {"sector_recommendations": [], "quick_wins": [], "resumen_ejecutivo": response.text[:200]}
+        except Exception as e:
+            logger.error(f"Error in Gemini Sector Recommendations: {e}")
+            return self._generate_fallback_sector_recommendations(sector_analysis, anomalies)
+
+    def _generate_fallback_sector_recommendations(self, sector_analysis: dict, anomalies: dict) -> dict:
+        """Fallback cuando Gemini no está disponible."""
+        recommendations = []
+        
+        inefficient = sector_analysis.get("inefficient_sectors", [])
+        for sector in inefficient[:5]:
+            rec = {
+                "sector": sector.get("name", "Sector"),
+                "problema": f"Consumo {sector.get('deviation_percent', 0):.0f}% sobre el benchmark",
+                "accion": f"Realizar auditoría energética en {sector.get('name', 'sector')}",
+                "responsable": "Facility Management",
+                "plazo": "Corto" if sector.get("deviation_percent", 0) < 40 else "Inmediato",
+                "ahorro_estimado": f"{sector.get('deviation_percent', 0) * 0.4:.0f}%",
+                "inversion_requerida": "Baja",
+                "roi_estimado": "3-6 meses"
+            }
+            recommendations.append(rec)
+        
+        # Agregar recomendación por consumo fuera de horario
+        off_hours = anomalies.get("off_hours_usage", {})
+        if off_hours.get("waste_percent", 0) > 5:
+            recommendations.append({
+                "sector": "General - Horarios",
+                "problema": f"{off_hours.get('waste_percent', 0):.1f}% del consumo ocurre fuera de horario",
+                "accion": "Implementar temporizadores y sensores de presencia",
+                "responsable": "Mantenimiento Eléctrico",
+                "plazo": "Corto",
+                "ahorro_estimado": f"{off_hours.get('waste_percent', 0) * 0.7:.0f}%",
+                "inversion_requerida": "Media",
+                "roi_estimado": "6-12 meses"
+            })
+        
+        return {
+            "sector_recommendations": recommendations,
+            "quick_wins": [
+                "Desconectar equipos en standby fuera de horario",
+                "Ajustar termostatos de climatización a 24°C",
+                "Revisar iluminación en áreas de bajo uso"
+            ],
+            "resumen_ejecutivo": f"Se identificaron {len(inefficient)} sectores con oportunidad de mejora. Potencial de ahorro estimado: 15-25%."
+        }
+
+    async def explain_model_decision(self, prediction: float, features: dict, shap_values: list = None) -> dict:
+        """
+        Objetivo 4: Explica las decisiones del modelo en lenguaje natural.
+        Traduce valores SHAP o features importantes a explicaciones comprensibles.
+        """
+        if not self.client:
+            return self._generate_fallback_explanation(prediction, features)
+
+        prompt = f"""
+        Rol: Científico de Datos explicando un modelo de ML a stakeholders no técnicos.
+        Misión: Traducir la predicción del modelo a lenguaje comprensible y confiable.
+        
+        PREDICCIÓN DEL MODELO: {prediction:.2f} kWh
+        
+        VARIABLES DE ENTRADA (Features):
+        {json.dumps(features, indent=2)}
+        
+        {f"VALORES SHAP (importancia de cada variable): {shap_values}" if shap_values else ""}
+        
+        INSTRUCCIONES:
+        1. Explica en 2-3 oraciones POR QUÉ el modelo predice este valor.
+        2. Destaca las 2-3 variables MÁS influyentes.
+        3. Indica si la predicción es "típica" o "atípica" para este contexto.
+        4. Sugiere qué cambios en las variables reducirían el consumo.
+        5. USA LENGUAJE CLARO, evita jerga técnica excesiva.
+        
+        FORMATO JSON:
+        {{
+            "explicacion_principal": "Por qué el modelo predice X kWh",
+            "factores_clave": ["Factor 1: explicación", "Factor 2: explicación"],
+            "tipo_prediccion": "normal/elevada/baja",
+            "sugerencias": ["Cómo reducir consumo basado en el modelo"],
+            "confianza": "alta/media/baja"
+        }}
+        """
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+            import re
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            return {"explicacion_principal": response.text[:300]}
+        except Exception as e:
+            logger.error(f"Error in Gemini Model Explanation: {e}")
+            return self._generate_fallback_explanation(prediction, features)
+
+    def _generate_fallback_explanation(self, prediction: float, features: dict) -> dict:
+        """Fallback para explicación sin IA."""
+        tipo = "normal"
+        if prediction > 300:
+            tipo = "elevada"
+        elif prediction < 100:
+            tipo = "baja"
+        
+        factores = []
+        if features.get("hora", 12) >= 10 and features.get("hora", 12) <= 14:
+            factores.append("Horario de máxima actividad académica (10-14h)")
+        if features.get("en_periodo_academico", 1) == 1:
+            factores.append("Periodo académico activo incrementa demanda base")
+        if features.get("temp_promedio_c", 18) > 25:
+            factores.append("Alta temperatura activa sistemas de climatización")
+        
+        return {
+            "explicacion_principal": f"El modelo predice {prediction:.0f} kWh basándose en el horario, ocupación y condiciones climáticas actuales.",
+            "factores_clave": factores[:3] if factores else ["Consumo base típico para la hora y día"],
+            "tipo_prediccion": tipo,
+            "sugerencias": ["Reducir cargas no esenciales en horas pico", "Optimizar climatización"],
+            "confianza": "media"
+        }
+
+
 gemini_service = GeminiService()

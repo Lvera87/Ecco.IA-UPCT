@@ -14,7 +14,11 @@ def test_robust_service():
     forecast2 = prediction_service.predict_campus_consumption("tun", days=3)
     print(f"Segunda llamada (caché): {forecast2['predictions'] if forecast2 else 'FALLO'}")
     
-    print("\n=== TEST 3: XGBoost con features correctas ===")
+    print("\n=== TEST 3: XGBoost DEBUG ===")
+    if "xgb_energia" in prediction_service.models:
+        model = prediction_service.models["xgb_energia"]
+        print(f"Tipo de modelo: {type(model)}")
+    
     impact = prediction_service.predict_resource_impact(
         campus_code="tun",
         hora=14,
@@ -22,8 +26,8 @@ def test_robust_service():
         num_edificios=12,
         area_m2=52300.0,
         temp_promedio_c=16.5,
-        energia_lag_1h=150.0,
-        energia_lag_24h=3600.0
+        lag_1h=150.0,
+        lag_24h=3600.0
     )
     print(f"Predicciones XGBoost: {impact}")
     

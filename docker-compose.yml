@@ -4,16 +4,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fastapi-backend
+    env_file:
+      - ./backend/.env
     environment:
       - ENVIRONMENT=development
-      - APP_NAME=${APP_NAME:-FastAPI Boilerplate}
-      - API_V1_PREFIX=${API_V1_PREFIX:-/api/v1}
-      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost:5173}
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/workspace/backend
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend:/app
+    # Evitar que el venv local interfiera con el del contenedor
+    # y asegurar que la DB persista si es sqlite
+    # - backend_data:/app/data 
 
   frontend:
     build:
@@ -22,11 +24,11 @@ services:
     container_name: react-frontend
     depends_on:
       - backend
-    environment:
-      - VITE_API_BASE_PATH=${VITE_API_BASE_PATH:-/api}
-      - VITE_API_VERSION=${VITE_API_VERSION:-v1}
+    env_file:
+      - ./frontend/.env
     ports:
       - "5173:5173"
     volumes:
       - ./frontend:/app
+      - /app/node_modules # Evitar sobreescribir node_modules del contenedor con el local
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

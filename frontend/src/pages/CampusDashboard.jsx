@@ -10,6 +10,7 @@ import {
     Tooltip, Legend, ResponsiveContainer, ReferenceLine, Bar
 } from 'recharts';
 import { campusApi } from '../api/campus';
+import AdvancedAnalyticsPanel from '../components/AdvancedAnalyticsPanel';
 
 /**
  * COMPONENTE: Tarjeta de Métrica KPI
@@ -153,7 +154,7 @@ const CampusDashboard = () => {
                     confidenceAvg: 0
                 };
 
-                if (predictions?.forecast) {
+                if (predictions && predictions.forecast) {
                     const { dates, predictions: preds, lower_bound, upper_bound } = predictions.forecast;
 
                     chartData = dates.map((date, i) => ({
@@ -176,6 +177,8 @@ const CampusDashboard = () => {
                     // Calcular promedio del "gap" de confianza (lower vs upper)
                     const totalGap = upper_bound.reduce((acc, v, i) => acc + (v - lower_bound[i]), 0);
                     kpis.confidenceAvg = Math.round(totalGap / dates.length);
+                } else {
+                    console.warn("No se recibieron predicciones válidas para este campus.");
                 }
 
                 setSystemData({
@@ -407,6 +410,23 @@ const CampusDashboard = () => {
                             Basado en la proyección de baja demanda para este día, es el momento óptimo para mantenimientos de la red eléctrica.
                         </p>
                     </div>
+                </div>
+
+                {/* 4. Panel de Análisis Avanzado (Objetivos 2, 3, 4) */}
+                <div className="bg-[#0a0f1e] border border-slate-800 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <AlertTriangle size={20} className="text-amber-500" />
+                                Análisis Avanzado de Eficiencia
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Detección de anomalías • Patrones ineficientes • Recomendaciones por sector • Explicabilidad (XAI)
+                            </p>
+                        </div>
+                    </div>
+
+                    <AdvancedAnalyticsPanel campusId={campus.id} campusName={campus.name} />
                 </div>
 
             </div>

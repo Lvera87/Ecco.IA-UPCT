@@ -37,7 +37,10 @@ class PredictionService:
     }
 
     def __init__(self):
-        self.models_path = os.path.join(os.getcwd(), "app", "ml_models")
+        # Usar pathlib para que las rutas sean relativas al archivo, no al directorio de trabajo
+        from pathlib import Path
+        current_file = Path(__file__).resolve()
+        self.models_path = current_file.parent.parent / "ml_models"
         self.models: Dict[str, Any] = {}
         self.is_loaded = False
         self._prediction_cache: Dict[str, Dict[str, Any]] = {}
@@ -84,67 +87,66 @@ class PredictionService:
             return False
         return True
 
-    def predict_campus_consumption(self, campus_code: str, days: int = 7) -> Optional[Dict[str, Any]]:
+    def predict_campus_consumption(self, campus_code: str, days: int = 7, start_date: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
         """
-        Predice el consumo para una sede usando Prophet.
-        Incluye caché para evitar recálculos innecesarios.
+        Realiza inferencia sobre un rango de fechas usando Prophet.
+        Si start_date es pasado, hace 'back-casting' (lo que el modelo dice que pasó).
         """
         # 1. Verificar caché
-        cache_key = self._get_cache_key(campus_code, days)
+        cache_key = f"{campus_code}_{days}_{start_date.strftime('%Y%m%d') if start_date else 'now'}"
         if self._is_cache_valid(cache_key):
-            logger.info(f"Usando predicción cacheada para {campus_code}")
             return self._prediction_cache[cache_key]['data']
 
-        # 2. Ejecutar predicción
         model_key = f"prophet_{campus_code}"
         if model_key not in self.models:
-            logger.warning(f"Modelo Prophet no encontrado: {model_key}")
             return None
 
         try:
             model = self.models[model_key]
-            future = model.make_future_dataframe(periods=days)
+            
+            # Crear un DataFrame de fechas personalizado (puede ser pasado o futuro)
+            base_date = start_date or datetime.now()
+            date_list = [base_date + timedelta(days=x) for x in range(days)]
+            future = pd.DataFrame({'ds': date_list})
+            
             forecast = model.predict(future)
-            recent_forecast = forecast.tail(days)
             
             result = {
-                "dates": recent_forecast['ds'].dt.strftime('%Y-%m-%d').tolist(),
-                "predictions": [round(v, 2) for v in recent_forecast['yhat'].tolist()],
-                "lower_bound": [round(v, 2) for v in recent_forecast['yhat_lower'].tolist()],
-                "upper_bound": [round(v, 2) for v in recent_forecast['yhat_upper'].tolist()]
+                "dates": forecast['ds'].dt.strftime('%Y-%m-%d').tolist(),
+                "predictions": [round(v, 2) for v in forecast['yhat'].tolist()],
+                "lower_bound": [round(v, 2) for v in forecast['yhat_lower'].tolist()],
+                "upper_bound": [round(v, 2) for v in forecast['yhat_upper'].tolist()],
+                "trend": [round(v, 2) for v in forecast['trend'].tolist()]
             }
             
-            # 3. Guardar en caché
-            self._prediction_cache[cache_key] = {
-                'data': result,
-                'timestamp': datetime.now()
-            }
-            logger.info(f"Predicción Prophet completada y cacheada para {campus_code}")
+            self._prediction_cache[cache_key] = {'data': result, 'timestamp': datetime.now()}
             return result
             
         except Exception as e:
-            logger.error(f"Error en predicción Prophet ({campus_code}): {e}")
+            logger.error(f"Error en inferencia Prophet ({campus_code}): {e}")
             return None
 
     def build_xgb_features(
         self,
         campus_code: str,
+        resource_type: str = "energia", # Nuevo parámetro para diferenciar
         hora: int = 12,
         num_estudiantes: int = 5000,
         num_edificios: int = 10,
         area_m2: float = 15000.0,
         temp_promedio_c: float = 18.0,
-        energia_lag_1h: float = 100.0,
-        energia_lag_24h: float = 2400.0,
+        lag_1h: float = 100.0,
+        lag_24h: float = 2400.0,
         es_festivo: bool = False,
         en_periodo_academico: bool = True
     ) -> pd.DataFrame:
         """
-        Construye un DataFrame con las 13 features requeridas por XGBoost.
+        Construye un DataFrame con las features específicas para cada modelo.
         """
         now = datetime.now()
         
-        features = {
+        # Features comunes
+        base_features = {
             'hora': hora,
             'dia_numero': now.weekday(),
             'es_fin_semana': 1 if now.weekday() >= 5 else 0,
@@ -155,44 +157,96 @@ class PredictionService:
             'temp_promedio_c': temp_promedio_c,
             'num_estudiantes': num_estudiantes,
             'num_edificios': num_edificios,
-            'area_m2': area_m2,
-            'energia_total_kwh_lag_1h': energia_lag_1h,
-            'energia_total_kwh_lag_24h': energia_lag_24h
+            'area_m2': area_m2
         }
+
+        # Features específicas según recurso
+        if resource_type == "agua":
+            base_features['agua_litros_lag_1h'] = lag_1h
+            base_features['agua_litros_lag_24h'] = lag_24h
+            feature_order = [
+                'hora', 'dia_numero', 'es_fin_semana', 'sede_code', 'es_festivo', 
+                'en_periodo_academico', 'mes', 'temp_promedio_c', 'num_estudiantes', 
+                'num_edificios', 'area_m2', 'agua_litros_lag_1h', 'agua_litros_lag_24h'
+            ]
+        else: # energia u ocupacion (asumimos que usan lags de energia por defecto o similar)
+            base_features['energia_total_kwh_lag_1h'] = lag_1h
+            base_features['energia_total_kwh_lag_24h'] = lag_24h
+            feature_order = [
+                'hora', 'dia_numero', 'es_fin_semana', 'sede_code', 'es_festivo', 
+                'en_periodo_academico', 'mes', 'temp_promedio_c', 'num_estudiantes', 
+                'num_edificios', 'area_m2', 'energia_total_kwh_lag_1h', 'energia_total_kwh_lag_24h'
+            ]
         
-        return pd.DataFrame([features])[self.REQUIRED_FEATURES]
+        # Features específicas según recurso
+        if resource_type == "agua":
+            base_features['agua_litros_lag_1h'] = lag_1h
+            base_features['agua_litros_lag_24h'] = lag_24h
+            feature_order = [
+                'hora', 'dia_numero', 'es_fin_semana', 'sede_code', 'es_festivo', 
+                'en_periodo_academico', 'mes', 'temp_promedio_c', 'num_estudiantes', 
+                'num_edificios', 'area_m2', 'agua_litros_lag_1h', 'agua_litros_lag_24h'
+            ]
+        elif resource_type == "ocupacion":
+            base_features['ocupacion_pct_lag_1h'] = lag_1h / 100.0 # Asumiendo entrada bruta, ajustar si es pct
+            base_features['ocupacion_pct_lag_24h'] = lag_24h / 100.0
+            feature_order = [
+                'hora', 'dia_numero', 'es_fin_semana', 'sede_code', 'es_festivo', 
+                'en_periodo_academico', 'mes', 'temp_promedio_c', 'num_estudiantes', 
+                'num_edificios', 'area_m2', 'ocupacion_pct_lag_1h', 'ocupacion_pct_lag_24h'
+            ]
+        else: # energia
+            base_features['energia_total_kwh_lag_1h'] = lag_1h
+            base_features['energia_total_kwh_lag_24h'] = lag_24h
+            feature_order = [
+                'hora', 'dia_numero', 'es_fin_semana', 'sede_code', 'es_festivo', 
+                'en_periodo_academico', 'mes', 'temp_promedio_c', 'num_estudiantes', 
+                'num_edificios', 'area_m2', 'energia_total_kwh_lag_1h', 'energia_total_kwh_lag_24h'
+            ]
+        
+        return pd.DataFrame([base_features])[feature_order]
 
     def predict_resource_impact(self, campus_code: str, **kwargs) -> Dict[str, float]:
         """
-        Usa los modelos XGBoost para predecir impacto en agua, energía u ocupación.
-        Ahora con validación de features correcta.
+        Usa los modelos XGBoost para predecir impacto.
         """
+        import xgboost as xgb
         results = {}
+        
+        # Mapeo de modelos y sus tipos de recurso
+        models_config = [
+            ("xgb_energia", "energia", "energy_prediction"),
+            ("xgb_agua", "agua", "water_prediction"),
+            ("xgb_ocupacion", "ocupacion", "occupancy_prediction")
+        ]
+        
         try:
-            df = self.build_xgb_features(campus_code, **kwargs)
-            # Asegurar que el DataFrame tenga los nombres de columnas correctos
-            df.columns = self.REQUIRED_FEATURES
-            
-            if "xgb_energia" in self.models:
-                pred = self.models["xgb_energia"].predict(df)
-                results["energy_prediction"] = round(float(pred[0]), 2)
-            
-            if "xgb_agua" in self.models:
-                pred = self.models["xgb_agua"].predict(df)
-                results["water_prediction"] = round(float(pred[0]), 2)
-                
-            if "xgb_ocupacion" in self.models:
-                pred = self.models["xgb_ocupacion"].predict(df)
-                results["occupancy_prediction"] = round(float(pred[0]), 2)
+            for model_key, resource_type, result_key in models_config:
+                if model_key in self.models:
+                    model = self.models[model_key]
+                    
+                    # Construir features ESPECÍFICAS para este modelo
+                    df = self.build_xgb_features(
+                        campus_code, 
+                        resource_type=resource_type,
+                        **kwargs
+                    )
+                    
+                    try:
+                        # Intento 1: Directo
+                        pred = model.predict(df)
+                    except Exception:
+                        # Intento 2: DMatrix con nombres explícitos
+                        feature_names = df.columns.tolist()
+                        dtest = xgb.DMatrix(df.values, feature_names=feature_names)
+                        booster = model.get_booster()
+                        pred = booster.predict(dtest)
+                    
+                    results[result_key] = round(float(pred[0]), 2)
                 
         except Exception as e:
-            logger.error(f"Error en predicción XGBoost: {e}")
-            # Fallback: usar ratios de eficiencia como estimación
-            ratios = self.get_efficiency_ratio("total")
-            energia_base = kwargs.get("energia_lag_1h", 100)
-            results["energy_prediction"] = round(energia_base * 1.05, 2)  # +5% estimado
-            results["water_prediction"] = round(energia_base * ratios["agua"], 2)
-            results["occupancy_prediction"] = round(kwargs.get("num_estudiantes", 5000) * ratios["ocupacion"], 2)
+            logger.error(f"Error CRÍTICO en predicción XGBoost: {e}")
+            raise e 
             
         return results
 
