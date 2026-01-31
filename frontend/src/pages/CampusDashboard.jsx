@@ -138,53 +138,12 @@ const CampusDashboard = () => {
                     campusApi.getPredictions(id, 7).catch(e => null)
                 ]);
 
-                // --- DATA HALLUCINATION FALLBACK (Ingeniería Inversa de Tristeza) ---
                 if (!campus) {
-                    console.warn("API Campus falló. Usando MOCK_DATA de alta fidelidad.");
-                    const mockName = id === '1' ? 'Sede Central Tunja' : id === '2' ? 'Seccional Duitama' : 'Sede Sogamoso';
-                    campus = {
-                        id: id,
-                        name: mockName,
-                        location_city: mockName.includes('Tunja') ? 'Tunja' : 'Boyacá',
-                        population_students: 12405,
-                        baseline_energy_kwh: 14500,
-                        status: 'online'
-                    };
+                    throw new Error("Campus not found");
                 }
 
-                if (!predictions || !predictions.forecast) {
-                    console.warn("ML Service falló. Generando simulación Prophet stocástica.");
-                    const today = new Date();
-                    const dates = Array.from({ length: 7 }, (_, i) => {
-                        const d = new Date(today);
-                        d.setDate(today.getDate() + i + 1);
-                        return d.toISOString().split('T')[0];
-                    });
-
-                    // Simulación matemática de curvas de carga con ruido gaussiano
-                    const baseLoad = 12000;
-                    const preds = dates.map(d => baseLoad + Math.sin(new Date(d).getDay()) * 2000 + Math.random() * 500);
-
-                    predictions = {
-                        forecast: {
-                            dates: dates,
-                            predictions: preds,
-                            lower_bound: preds.map(v => v * 0.92), // Banda de confianza del 8%
-                            upper_bound: preds.map(v => v * 1.08)
-                        },
-                        ai_analysis: {
-                            critical_level: 'medium',
-                            summary: 'Tendencia estable con picos moderados a mitad de semana. Se observa correlación con horarios académicos.',
-                            recommendations: [
-                                'Optimizar arranque de chillers (06:00 AM) para evitar pico de demanda coincidente.',
-                                'Revisar factor de potencia en Bloque de Ingeniería.',
-                                'Programar mantenimiento de UPS durante ventana de baja carga (Domingo).'
-                            ],
-                            ai_analysis: { raw_score: 0.85, model_version: 'v2.1-hybrid' }
-                        }
-                    };
-                }
-                // --- END FALLBACK ---
+                // Si no hay predicciones, no inventamos datos.
+                // El frontend manejará `predictions` nulo mostrando estado "Sin Proyección" o similar.
 
                 // 2. Procesar Datos para Visualización Profesional
                 let chartData = [];

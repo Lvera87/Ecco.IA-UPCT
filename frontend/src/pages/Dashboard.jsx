@@ -12,12 +12,7 @@ import {
 import { campusApi } from '../api/campus';
 
 // --- DEMO DATA FALLBACK (Antídoto a la "Tristeza") ---
-const DEMO_CAMPUSES = [
-  { id: 1, name: 'Sede Central Tunja', location_city: 'Tunja', baseline_energy_kwh: 14500, status: 'online' },
-  { id: 2, name: 'Seccional Duitama', location_city: 'Duitama', baseline_energy_kwh: 8200, status: 'warning' },
-  { id: 3, name: 'Seccional Sogamoso', location_city: 'Sogamoso', baseline_energy_kwh: 11300, status: 'online' },
-  { id: 4, name: 'Sede Chiquinquirá', location_city: 'Chiquinquirá', baseline_energy_kwh: 5400, status: 'maintenance' },
-];
+
 
 const COLOR_MAP = {
   emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', hoverBorder: 'hover-border-emerald-500/50', iconBg: 'bg-emerald-500/10', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]' },
@@ -70,7 +65,7 @@ const GlobalMetric = ({ title, value, unit, icon: Icon, color, trend }) => {
   );
 };
 
-const CampusNode = ({ campus, onClick }) => (
+const CampusNode = ({ campus, prediction, onClick }) => (
   <div
     onClick={onClick}
     className="cursor-pointer relative overflow-hidden rounded-xl bg-[#0c1220] border border-slate-800 hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] transition-all duration-300 group"
@@ -98,9 +93,14 @@ const CampusNode = ({ campus, onClick }) => (
 
       <div className="mt-6 pt-4 border-t border-slate-800/50 flex justify-between items-end">
         <div>
-          <p className="text-[10px] text-slate-500 uppercase font-mono mb-1">Carga Actual</p>
+          <p className="text-[10px] text-slate-500 uppercase font-mono mb-1">
+            {prediction ? "Proyección Hoy" : "Carga Basal Est."}
+          </p>
           <p className="text-xl font-bold text-white font-mono">
-            {(campus.baseline_energy_kwh * 0.8 / 30).toFixed(1)} <span className="text-xs text-slate-500">kWh/h</span>
+            {prediction
+              ? `${Math.round(prediction.forecast.predictions[0])} kWh`
+              : `${(campus.baseline_energy_kwh / 30).toFixed(0)} kWh`
+            }
           </p>
         </div>
 
@@ -120,97 +120,71 @@ const Dashboard = () => {
 
   // Estado para la gráfica agregada real
   const [globalChartData, setGlobalChartData] = useState([]);
+  const [campusPredictions, setCampusPredictions] = useState({});
 
   useEffect(() => {
     const fetchGlobalData = async () => {
       try {
-        // 1. Obtener Sedes
+        // 1. Obtener Sedes Reales
         const campusesData = await campusApi.getAll();
+        setCampuses(campusesData || []);
 
-        let validCampuses = [];
-        if (campusesData && campusesData.length > 0) {
-          validCampuses = campusesData;
-        } else {
-          console.warn("API returned empty, using fallback demo data");
-          validCampuses = DEMO_CAMPUSES;
+        if (!campusesData || campusesData.length === 0) {
+          setLoading(false);
+          return;
         }
-        setCampuses(validCampuses);
 
-        // 2. Obtener Predicciones de CADA sede para agregar
-        // Esto le da valor real a la gráfica: es la SUMA de los modelos Prophet
-        const predictionsPromises = validCampuses.map(c =>
+        // 2. Obtener Predicciones Reales
+        const predictionsPromises = campusesData.map(c =>
           campusApi.getPredictions(c.id, 7).catch(e => {
             console.error(`Error fetching predictions for campus ${c.id}:`, e);
-            return null; // Return null for failed predictions
+            return null;
           })
         );
 
         const allPredictions = await Promise.all(predictionsPromises);
 
-        // 3. Agregar Datos (Sumar día a día)
-        const aggregatedMap = {}; // { "MM-DD": { value: 0, date: "..." } }
+        // Map predictions by ID for nodes
+        const predMap = {};
+        campusesData.forEach((c, i) => {
+          predMap[c.id] = allPredictions[i];
+        });
+        setCampusPredictions(predMap);
 
-        allPredictions.forEach((pred, index) => {
-          if (pred && pred.forecast) {
+        // 3. Agregar Datos (Solo si existen)
+        const aggregatedMap = {};
+
+        allPredictions.forEach((pred) => {
+          if (pred && pred.forecast && pred.forecast.dates) {
             pred.forecast.dates.forEach((date, i) => {
               const shortDate = date.substring(5); // MM-DD
               if (!aggregatedMap[shortDate]) {
-                aggregatedMap[shortDate] = { time: shortDate, value: 0, fullDate: date };
+                aggregatedMap[shortDate] = { time: shortDate, value: 0 };
               }
-              // Sumamos la predicción de esta sede
               aggregatedMap[shortDate].value += (pred.forecast.predictions[i] || 0);
             });
-          } else {
-            // Si falla el modelo para una sede, usamos fallback (basal) para no romper la suma
-            // Fallback inteligente: Usar baseline / 7 días
-            const textDate = new Date();
-            for (let k = 0; k < 7; k++) {
-              const d = new Date();
-              d.setDate(d.getDate() + k);
-              const key = d.toISOString().split('T')[0].substring(5);
-              if (!aggregatedMap[key]) aggregatedMap[key] = { time: key, value: 0 };
-              // Add baseline daily estimate
-              aggregatedMap[key].value += ((validCampuses[index].baseline_energy_kwh || 10000) / 30);
-            }
           }
         });
 
-        // Convertir a array y ordenar
         const aggregatedChart = Object.values(aggregatedMap)
           .sort((a, b) => a.time.localeCompare(b.time))
           .map(item => ({ ...item, value: Math.round(item.value) }));
 
         setGlobalChartData(aggregatedChart);
 
-        // Calcular métricas totales basadas en la proyección real
+        // Métricas solo con datos reales
+        const totalBaseline = campusesData.reduce((acc, c) => acc + (c.baseline_energy_kwh || 0), 0);
         const totalProjected = aggregatedChart.reduce((acc, curr) => acc + curr.value, 0);
 
         setMetrics({
-          totalEnergy: totalProjected,
-          activeAlerts: 2,
-          efficiency: 92.4
+          totalEnergy: totalProjected || totalBaseline, // Fallback to baseline sum if no predictions
+          activeAlerts: 0, // Real alert logic needed here
+          efficiency: 0 // Real efficiency logic needed
         });
 
       } catch (e) {
         console.error("Dashboard error:", e);
-        setCampuses(DEMO_CAMPUSES);
-        // Fallback for chart data if API fails completely
-        const total = DEMO_CAMPUSES.reduce((acc, c) => acc + (c.baseline_energy_kwh || 0), 0);
-        setMetrics({
-          totalEnergy: total,
-          activeAlerts: 1,
-          efficiency: 88.5
-        });
-        // Mock global aggregate chart data with more movement
-        const demoGlobalChartData = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() + i);
-          return {
-            time: d.toISOString().split('T')[0].substring(5),
-            value: Math.floor(Math.random() * 3000) + 8000 + (Math.sin(i / 3) * 2000)
-          };
-        });
-        setGlobalChartData(demoGlobalChartData);
+        // NO MOCK DATA ON ERROR
       } finally {
         setLoading(false);
       }
@@ -274,127 +248,127 @@ const Dashboard = () => {
             <p className="text-sm text-slate-500 font-mono">TIEMPO DE EJECUCIÓN</p>
             <p className="text-2xl font-bold text-white font-mono">14d 03h 22m</p>
           </div>
-        </div>
 
-        {/* GLOBAL METRICS ROW */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <GlobalMetric
-            title="Consumo Proyectado (Mes)"
-            value={metrics.totalEnergy.toLocaleString()}
-            unit="kWh"
-            icon={Zap}
-            color="blue"
-            trend={-2.4}
-          />
-          <GlobalMetric
-            title="Alertas de Sistema"
-            value={metrics.activeAlerts}
-            unit="Críticas"
-            icon={AlertTriangle}
-            color="amber"
-            trend={0}
-          />
-          <GlobalMetric
-            title="Impacto Poblacional"
-            value="12.4k"
-            unit="Usuarios"
-            icon={Users}
-            color="purple"
-            trend={+5.1}
-          />
-          <GlobalMetric
-            title="Índice de Eficiencia"
-            value={metrics.efficiency}
-            unit="%"
-            icon={Activity}
-            color="emerald"
-            trend={+1.2}
-          />
-        </div>
+          {/* GLOBAL METRICS ROW */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <GlobalMetric
+              title="Proyección Cierre Mes"
+              value={metrics.totalEnergy.toLocaleString()}
+              unit="kWh"
+              icon={Zap}
+              color="blue"
+              trend={-2.4}
+            />
+            <GlobalMetric
+              title="Alertas Operativas"
+              value={metrics.activeAlerts}
+              unit="Críticas"
+              icon={AlertTriangle}
+              color="amber"
+              trend={0}
+            />
+            <GlobalMetric
+              title="Ocupación Estimada"
+              value="12.4k"
+              unit="Personas"
+              icon={Users}
+              color="purple"
+              trend={+5.1}
+            />
+            <GlobalMetric
+              title="Índice de Eficiencia"
+              value={metrics.efficiency}
+              unit="%"
+              icon={Activity}
+              color="emerald"
+              trend={+1.2}
+            />
+          </div>
 
-        {/* MAIN SECTION: MAP & GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-auto lg:h-[500px]">
+          {/* MAIN SECTION: MAP & GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-auto lg:h-[500px]">
 
-          {/* LEFT: AGGREGATE CHART (Now on Left for emphasis/Dashboard look) */}
-          <div className="lg:col-span-2 bg-[#0a0f1e] border border-slate-800 rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-colors">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none opacity-50" />
+            {/* LEFT: AGGREGATE CHART (Now on Left for emphasis/Dashboard look) */}
+            <div className="lg:col-span-2 bg-[#0a0f1e] border border-slate-800 rounded-xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none opacity-50" />
 
-            <div className="flex justify-between items-center mb-6 relative z-10">
-              <h3 className="text-white text-lg font-bold flex items-center gap-3">
-                <Activity size={20} className="text-blue-500" />
-                Telemetría de Red Global
-              </h3>
-              <div className="flex gap-2">
-                {['7 Días (Proyección)'].map(range => (
-                  <button key={range} className={`px-3 py-1 rounded text-[10px] font-bold bg-blue-600 text-white cursor-default`}>
-                    {range}
-                  </button>
-                ))}
+              <div className="flex justify-between items-center mb-6 relative z-10">
+                <h3 className="text-white text-lg font-bold flex items-center gap-3">
+                  <Activity size={20} className="text-blue-500" />
+                  Perfil de Carga Agregado (Control Operativo)
+                </h3>
+                <div className="flex gap-2">
+                  {['Semana Operativa'].map(range => (
+                    <button key={range} className={`px-3 py-1 rounded text-[10px] font-bold bg-blue-600 text-white cursor-default`}>
+                      {range}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 w-full min-h-0 relative z-10">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={globalChartData}>
+                    <defs>
+                      <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} opacity={0.5} />
+                    <XAxis dataKey="time" hide />
+                    <YAxis orientation="right" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e2e8f0', fontSize: '12px' }}
+                      labelStyle={{ display: 'none' }}
+                      cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorGlobal)"
+                      isAnimationActive={true}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="flex-1 w-full min-h-0 relative z-10">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={globalChartData}>
-                  <defs>
-                    <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} opacity={0.5} />
-                  <XAxis dataKey="time" hide />
-                  <YAxis orientation="right" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                    itemStyle={{ color: '#e2e8f0', fontSize: '12px' }}
-                    labelStyle={{ display: 'none' }}
-                    cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
+            {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
+            <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
+              <div className="flex items-center justify-between pb-2">
+                <h2 className="text-white font-bold flex items-center gap-2">
+                  <LayoutGrid size={20} className="text-emerald-500" />
+                  Sedes Conectadas
+                </h2>
+                <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+                {campuses.map(campus => (
+                  <CampusNode
+                    key={campus.id}
+                    campus={campus}
+                    prediction={campusPredictions[campus.id]}
+                    onClick={() => navigate(`/campuses/${campus.id}`)}
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#3b82f6"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorGlobal)"
-                    isAnimationActive={true}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+                ))}
+
+                {/* Add New Node Placeholder */}
+                <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                  + Vincular Nueva Sede
+                </button>
+              </div>
             </div>
+
           </div>
-
-          {/* RIGHT: CAMPUS LIST (Vertical Scrollable List) */}
-          <div className="lg:col-span-1 space-y-4 flex flex-col h-full">
-            <div className="flex items-center justify-between pb-2">
-              <h2 className="text-white font-bold flex items-center gap-2">
-                <LayoutGrid size={20} className="text-emerald-500" />
-                Sedes Conectadas
-              </h2>
-              <span className="text-xs font-mono text-slate-500">{campuses.length} ACTIVAS</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-              {campuses.map(campus => (
-                <CampusNode
-                  key={campus.id}
-                  campus={campus}
-                  onClick={() => navigate(`/campuses/${campus.id}`)}
-                />
-              ))}
-
-              {/* Add New Node Placeholder */}
-              <button className="w-full py-4 border border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                + Vincular Nueva Sede
-              </button>
-            </div>
-          </div>
-
         </div>
       </div>
-    </div>
-  );
+      );
 };
 
-export default Dashboard;
+      export default Dashboard;
