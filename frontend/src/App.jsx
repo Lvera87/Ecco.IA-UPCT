@@ -11,6 +11,7 @@ import EnergyManagement from './pages/EnergyManagement.jsx';
 import CarbonFootprint from './pages/CarbonFootprint.jsx';
 import DesignSystem from './pages/DesignSystem.jsx';
 import UserProfile from './pages/UserProfile.jsx';
+import AllCampusesSummary from './pages/AllCampusesSummary.jsx';
 import Layout from './components/Layout.jsx';
 import InfrastructureConfig from './pages/InfrastructureConfig.jsx';
 import InfrastructureAssistant from './pages/InfrastructureAssistant.jsx';
@@ -35,6 +36,8 @@ function App() {
             <Route path="/results-dashboard" element={<ResultsDashboard />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/profile" element={<UserProfile />} />
+            <Route path="/sedes" element={<AllCampusesSummary />} />
+            <Route path="/campus/:id" element={<CampusDashboard />} />
           </Routes>
         </Layout>
       </Router>

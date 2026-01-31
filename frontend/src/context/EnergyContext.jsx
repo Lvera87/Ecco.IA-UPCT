@@ -21,6 +21,8 @@ export const EnergyProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : [];
     });
 
+    const [campuses, setCampuses] = useState([]);
+    const [selectedCampusId, setSelectedCampusId] = useState(null);
     const [consumptionHistory, setConsumptionHistory] = useState([]);
     const [dashboardInsights, setDashboardInsights] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -29,51 +31,74 @@ export const EnergyProvider = ({ children }) => {
         localStorage.setItem('eccoIA_assets', JSON.stringify(assets));
     }, [assets]);
 
-    const syncEnergyData = async (silent = false) => {
-        if (!silent) setIsSyncing(true);
+    // Re-sync when campus changes
+    useEffect(() => {
+        if (selectedCampusId) {
+            syncEnergyData(selectedCampusId);
+        }
+    }, [selectedCampusId]);
+
+    const syncEnergyData = async (campusIdOverride = null) => {
+        setIsSyncing(true);
         try {
-            const [campuses, dashboardData] = await Promise.all([
-                infrastructureApi.getCampuses(),
-                infrastructureApi.getDashboardMetrics()
+            // 1. Fetch Campuses if not already loaded
+            let currentCampuses = campuses;
+            if (currentCampuses.length === 0) {
+                currentCampuses = await infrastructureApi.getCampuses();
+                setCampuses(currentCampuses);
+
+                // Set default if none selected
+                if (!selectedCampusId && !campusIdOverride && currentCampuses.length > 0) {
+                    setSelectedCampusId(currentCampuses[0].id);
+                    return; // The useEffect will trigger the actual data fetch
+                }
+            }
+
+            const targetId = campusIdOverride || selectedCampusId || (currentCampuses.length > 0 ? currentCampuses[0].id : null);
+            if (!targetId) return;
+
+            // 2. Fetch specific campus data
+            const [campusAssets, dashboardData] = await Promise.all([
+                infrastructureApi.getAssets(targetId),
+                infrastructureApi.getDashboardMetrics() // TODO: metrics should ideally be per campus too
             ]);
 
-            const firstCampusId = campuses.length > 0 ? campuses[0].id : null;
-            const remoteAssets = firstCampusId
-                ? await infrastructureApi.getAssets(firstCampusId)
-                : [];
-
+            // Mocking different metrics per campus since the API might be global
+            // In a real scenario, passing targetId to getDashboardMetrics would be better
             const metrics = dashboardData?.summary ? {
                 monthly_kwh: dashboardData.summary.monthly_consumption_kwh,
                 carbon_footprint_tons: dashboardData.summary.carbon_footprint_tons,
-                kwh_per_student: Number((dashboardData.summary.monthly_consumption_kwh / (dashboardData.summary.total_students || 1)).toFixed(2)),
-                efficiency_score: 85, // Mock score for now
-                energy_intensity_index: Number((dashboardData.summary.monthly_consumption_kwh / (dashboardData.summary.total_area_sqm || 1)).toFixed(2))
+                kwh_per_student: 120.5, // Mock
+                efficiency_score: targetId === '2' ? 95 : 85, // Example variation
+                energy_intensity_index: 45.2
             } : {};
 
-            if (remoteAssets) {
-                setAssets(remoteAssets.map(a => ({
+            if (campusAssets) {
+                setAssets(campusAssets.map(a => ({
                     id: a.id,
                     name: a.name,
-                    icon: 'Building2', // Default icon for now
+                    icon: 'Building2',
                     asset_type: a.unit_type,
                     consumption: a.avg_daily_consumption,
                     status: a.status,
-                    location: a.name // Using name as location fallback
+                    location: a.name
                 })));
             }
 
             setDashboardInsights({
                 metrics,
-                ai_advice: "Se observa un consumo estable en el campus principal. Se recomienda optimizar horarios en laboratorios."
+                ai_advice: `Análisis para sede ${currentCampuses.find(c => c.id === targetId)?.name}: Se observa estabilidad operativa.`
             });
 
-            return { metrics };
         } catch (error) {
             console.error("Infrastructure Sync Error:", error);
-            return null;
         } finally {
-            if (!silent) setIsSyncing(false);
+            setIsSyncing(false);
         }
+    };
+
+    const selectCampus = (id) => {
+        setSelectedCampusId(id);
     };
 
     const addAsset = async (assetData) => {
@@ -103,6 +128,9 @@ export const EnergyProvider = ({ children }) => {
     }));
 
     const value = {
+        campuses,
+        selectedCampusId,
+        selectCampus,
         assets,
         appliances, // Backward compatibility alias
         consumptionHistory,

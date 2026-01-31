@@ -13,6 +13,7 @@ import StatCard from '../components/ui/StatCard';
 import EmptyState from '../components/ui/EmptyState';
 import InfrastructureAlert from '../components/ui/InfrastructureAlert';
 import CampusConsumptionChart from '../components/dashboard/CampusConsumptionChart';
+import CampusSelector from '../components/dashboard/CampusSelector';
 import { useUser } from '../context/UserContext';
 import { useEnergy } from '../context/EnergyContext';
 
@@ -25,7 +26,7 @@ const Dashboard = () => {
   const { userProfile, syncUserProfile } = useUser();
   const {
     assets, consumptionHistory, dashboardInsights,
-    isSyncing, syncEnergyData
+    isSyncing, syncEnergyData, campuses, selectedCampusId
   } = useEnergy();
 
   const [mounted, setMounted] = React.useState(false);
@@ -102,6 +103,9 @@ const Dashboard = () => {
                 Gestión unificada de sedes y activos energéticos.
               </p>
             </div>
+            <div className="mt-4">
+              <CampusSelector />
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -143,11 +147,11 @@ const Dashboard = () => {
                   </div>
                   <div>
                     <h3 className="text-xl font-display font-bold text-white">
-                      {config.campus_name || 'Sede UPTC'}
+                      {campuses.find(c => c.id === selectedCampusId)?.name || config.campus_name || 'Sede UPTC'}
                     </h3>
                     <p className="text-sm text-uptc-gold flex items-center gap-1">
                       <MapPin size={14} />
-                      {config.city || 'Boyacá'}
+                      {campuses.find(c => c.id === selectedCampusId)?.city || config.city || 'Boyacá'}
                     </p>
                   </div>
                 </div>

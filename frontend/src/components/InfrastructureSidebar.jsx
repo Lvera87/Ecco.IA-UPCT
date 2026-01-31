@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Server, BarChart3, Wind,
-  MessageSquareText, Settings, LogOut, Bell, BellDot
+  MessageSquareText, Settings, LogOut, Bell, BellDot, Building2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
@@ -14,6 +14,7 @@ const InfrastructureSidebar = () => {
 
   const menuItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Control Sede" },
+    { to: "/sedes", icon: Building2, label: "Resumen Sedes" },
     { to: "/energy-management", icon: Server, label: "Activos UPTC" },
     { to: "/energy-analysis", icon: BarChart3, label: "Analítica" },
     { to: "/carbon-footprint", icon: Wind, label: "Huella Carbono" },
