@@ -314,7 +314,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="w-full h-[350px] relative z-10">
+          <div style={{ width: '100%', height: 350 }} className="relative z-10">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={globalChartData}>
                 <defs>
