@@ -135,21 +135,18 @@ const Dashboard = () => {
         }
 
         // 2. Obtener Predicciones Reales
-        const predictionsPromises = campusesData.map(c =>
-          campusApi.getPredictions(c.id, 7).catch(e => {
-            console.error(`Error fetching predictions for campus ${c.id}:`, e);
-            return null;
-          })
-        );
-
-        const allPredictions = await Promise.all(predictionsPromises);
-
-        // Map predictions by ID for nodes
-        const predMap = {};
-        campusesData.forEach((c, i) => {
-          predMap[c.id] = allPredictions[i];
-        });
-        setCampusPredictions(predMap);
+        // Carga secuencial para evitar saturar el backend en Windows con modelos pesados
+        const predictionsData = {};
+        for (const c of campusesData) {
+          try {
+            const pred = await campusApi.getPredictions(c.id, 7);
+            predictionsData[c.id] = pred;
+          } catch (err) {
+            console.error(`Error fetching predictions for campus ${c.id}:`, err);
+            predictionsData[c.id] = null;
+          }
+        }
+        setCampusPredictions(predictionsData);
 
         // 3. Agregar Datos (Solo si existen)
         const aggregatedMap = {};
@@ -314,7 +311,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div style={{ width: '100%', height: 350 }} className="relative z-10">
+          <div className="h-80 w-full min-h-[320px] relative z-10">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={globalChartData}>
                 <defs>

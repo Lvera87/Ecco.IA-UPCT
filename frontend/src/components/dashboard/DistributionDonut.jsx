@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const data = [
   { name: 'Laboratorios', value: 35, color: '#ef4444' }, // Rojo
@@ -16,29 +16,27 @@ const DistributionDonut = () => {
         Distribución por Sector
       </h3>
 
-      <div className="w-full h-[200px] relative min-w-[200px] min-h-[200px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={80}
-              paddingAngle={5}
-              dataKey="value"
-              stroke="none"
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
-              itemStyle={{ color: '#fff' }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="w-full h-[200px] relative flex justify-center">
+        <PieChart width={200} height={200}>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="value"
+            stroke="none"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
+            itemStyle={{ color: '#fff' }}
+          />
+        </PieChart>
 
         {/* Texto Central */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

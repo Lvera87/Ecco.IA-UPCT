@@ -39,16 +39,17 @@ class PredictionService:
     def __init__(self):
         # Usar pathlib para que las rutas sean relativas al archivo, no al directorio de trabajo
         from pathlib import Path
+        import threading
         current_file = Path(__file__).resolve()
         self.models_path = current_file.parent.parent / "ml_models"
         self.models: Dict[str, Any] = {}
-        self.is_loaded = False
+        self._lock = threading.Lock() # Bloqueo para evitar colapsos en Windows
         self._prediction_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_ttl_minutes = 60
-        self._load_models()
+        logger.info("PredictionService initialized (Lazy Loading mode).")
 
-    def _load_models(self):
-        """Carga los modelos en memoria al iniciar."""
+    def _get_model(self, model_key: str):
+        """Carga el modelo solo cuando se necesita (Lazy Loading)."""
         model_files = {
             "prophet_tun": "prophet_uptc_tun.pkl",
             "prophet_dui": "prophet_uptc_dui.pkl",
@@ -56,22 +57,26 @@ class PredictionService:
             "prophet_chi": "prophet_uptc_chi.pkl",
             "xgb_agua": "xgb_agua.pkl",
             "xgb_energia": "xgb_energia.pkl",
-            "xgb_ocupacion": "xgb_ocupacion.pkl",
-            "metadata": "metadata_sistema.pkl"
+            "xgb_ocupacion": "xgb_ocupacion.pkl"
         }
 
-        try:
-            for key, filename in model_files.items():
-                full_path = os.path.join(self.models_path, filename)
-                if os.path.exists(full_path):
-                    self.models[key] = joblib.load(full_path)
-                    logger.info(f"Modelo ML cargado: {filename}")
-                else:
-                    logger.warning(f"No se encontró el modelo: {filename}")
+        with self._lock:
+            if model_key in self.models:
+                return self.models[model_key]
             
-            self.is_loaded = True
-        except Exception as e:
-            logger.error(f"Error cargando modelos de ML: {e}")
+            filename = model_files.get(model_key)
+            if not filename:
+                return None
+                
+            full_path = os.path.join(self.models_path, filename)
+            if os.path.exists(full_path):
+                try:
+                    logger.info(f"Cargando modelo bajo demanda: {filename}...")
+                    self.models[model_key] = joblib.load(full_path)
+                    return self.models[model_key]
+                except Exception as e:
+                    logger.error(f"Error cargando {filename}: {e}")
+            return None
 
     def _get_cache_key(self, campus_code: str, days: int) -> str:
         """Genera clave única para el caché."""
@@ -97,19 +102,28 @@ class PredictionService:
         if self._is_cache_valid(cache_key):
             return self._prediction_cache[cache_key]['data']
 
-        model_key = f"prophet_{campus_code}"
-        if model_key not in self.models:
+        # Mapear código de sede al modelo Prophet correspondiente
+        prophet_map = {
+            "tun": "prophet_tun",
+            "dui": "prophet_dui",
+            "sog": "prophet_sog",
+            "chi": "prophet_chi"
+        }
+        model_key = prophet_map.get(campus_code, "prophet_tun")
+        
+        model = self._get_model(model_key)
+        if not model:
             return None
 
         try:
-            model = self.models[model_key]
-            
-            # Crear un DataFrame de fechas personalizado (puede ser pasado o futuro)
-            base_date = start_date or datetime.now()
-            date_list = [base_date + timedelta(days=x) for x in range(days)]
-            future = pd.DataFrame({'ds': date_list})
-            
-            forecast = model.predict(future)
+            # Bloquear la inferencia para que Windows no colapse con hilos de C++
+            with self._lock:
+                # Crear un DataFrame de fechas personalizado (puede ser pasado o futuro)
+                base_date = start_date or datetime.now()
+                date_list = [base_date + timedelta(days=x) for x in range(days)]
+                future = pd.DataFrame({'ds': date_list})
+                
+                forecast = model.predict(future)
             
             result = {
                 "dates": forecast['ds'].dt.strftime('%Y-%m-%d').tolist(),
@@ -231,9 +245,8 @@ class PredictionService:
         
         try:
             for model_key, resource_type, result_key in models_config:
-                if model_key in self.models:
-                    model = self.models[model_key]
-                    
+                model = self._get_model(model_key)
+                if model:
                     # Construir features ESPECÍFICAS para este modelo
                     df = self.build_xgb_features(
                         campus_code, 
@@ -242,14 +255,17 @@ class PredictionService:
                     )
                     
                     try:
-                        # Intento 1: Directo
-                        pred = model.predict(df)
+                        # Bloquear inferencia XGBoost
+                        with self._lock:
+                            # Intento 1: Directo
+                            pred = model.predict(df)
                     except Exception:
-                        # Intento 2: DMatrix con nombres explícitos
-                        feature_names = df.columns.tolist()
-                        dtest = xgb.DMatrix(df.values, feature_names=feature_names)
-                        booster = model.get_booster()
-                        pred = booster.predict(dtest)
+                        with self._lock:
+                            # Intento 2: DMatrix con nombres explícitos
+                            feature_names = df.columns.tolist()
+                            dtest = xgb.DMatrix(df.values, feature_names=feature_names)
+                            booster = model.get_booster()
+                            pred = booster.predict(dtest)
                     
                     results[result_key] = round(float(pred[0]), 2)
                 

@@ -1,4 +1,4 @@
-from google import genai
+import google.generativeai as genai
 from app.core.config import get_settings
 import json
 import logging
@@ -10,19 +10,24 @@ class GeminiService:
         settings = get_settings()
         self.api_key = settings.gemini_api_key
         self.model_name = settings.gemini_model_name
+        self.model = None
         
         if self.api_key:
-            # Nueva librería google-genai usa un cliente centralizado
-            self.client = genai.Client(api_key=self.api_key)
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                logger.info("Gemini Service configured successfully (Standard Lib).")
+            except Exception as e:
+                logger.error(f"Failed to configure Gemini: {e}")
+                self.model = None
         else:
-            self.client = None
             logger.warning("Gemini API Key not found. AI features will be disabled.")
 
     async def get_residential_insights(self, home_context: dict) -> dict:
         """
         Analiza los datos del hogar y devuelve insights.
         """
-        if not self.client:
+        if not self.model:
             return {}
 
         prompt = f"""
@@ -41,12 +46,12 @@ class GeminiService:
         }}
         """
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self.model.generate_content(
                 contents=prompt
             )
             import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            clean_text = response.text.replace('```json', '').replace('```', '').strip()
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
             return {}
@@ -57,7 +62,7 @@ class GeminiService:
         """
         Analiza los datos de un campus universitario y genera recomendaciones de sostenibilidad.
         """
-        if not self.client:
+        if not self.model:
             return {}
 
         prompt = f"""
@@ -82,12 +87,12 @@ class GeminiService:
         }}
         """
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self.model.generate_content(
                 contents=prompt
             )
             import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            clean_text = response.text.replace('```json', '').replace('```', '').strip()
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
             return {}
@@ -95,48 +100,16 @@ class GeminiService:
             logger.error(f"Error calling Gemini Campus: {e}")
             return {}
     async def get_prediction_insights(self, predictions: dict, campus_name: str) -> dict:
-        """
-        Toma las predicciones matemáticas de ML y las traduce a lenguaje humano accionable con Gemini.
-        """
-        if not self.client:
-            return {"response": "IA no configurada para interpretar predicciones."}
-
-        prompt = f"""
-        Rol: Ingeniero de Datos Energéticos para Ecco-IA (Nivel Experto).
-        Objetivo: Interpretar modelos predictivos (Facebook Prophet / XGBoost) para toma de decisiones ejecutivas.
+        if not self.model:
+             return {"summary": "Sin IA", "critical_level": "low", "recommendations": [], "ai_analysis": "No disponible"}
         
-        SEDE: {campus_name}
-        TELEMETRÍA PREDICTIVA (Horizonte 7 H):
-        {json.dumps(predictions, indent=2)}
-        
-        INSTRUCCIONES:
-        1. Analiza la **Tendencia Central** y los **Intervalos de Confianza** (Incertidumbre).
-        2. Si el límite superior ('upper_bound') es alto, alerta sobre posibles picos de demanda.
-        3. Provee 3 estrategias de mitigación ingenieriles (Gestión de Demanda, Deslastre de Carga, etc.).
-        4. Usa lenguaje técnico, preciso y profesional (evita generalidades).
-        
-        FORMATO DEL REPORTE (JSON ESTRICTO):
-        {{
-            "summary": "Diagnóstico conciso de la tendencia y riesgo identificado (máx 1 frase)",
-            "critical_level": "low/medium/high (Basado en picos proyectados vs promedio)",
-            "recommendations": ["Estrategia 1 (Técnica)", "Estrategia 2 (Operativa)", "Estrategia 3 (Preventiva)"],
-            "ai_analysis": "Análisis profundo de la serie de tiempo. Menciona días críticos y volatilidad esperada."
-        }}
-        """
+        # Implementación simplificada
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group(0))
-            return {"summary": "Análisis generado", "ai_analysis": response.text}
+             response = self.model.generate_content(f"Analiza predicción energía en {campus_name}: {json.dumps(predictions)}")
+             return {"summary": "Análisis IA", "ai_analysis": response.text, "recommendations": [], "critical_level": "low"}
         except Exception as e:
-            logger.error(f"Error in Gemini Prediction Insights: {e}")
-            # FALLBACK: Generar respuesta básica sin IA
-            return self._generate_fallback_insights(predictions, campus_name)
+             logger.error(f"Error in Gemini Prediction Insights: {e}")
+             return {"summary": "Error", "ai_analysis": "Error", "recommendations": [], "critical_level": "low"}
 
     def _generate_fallback_insights(self, predictions: dict, campus_name: str) -> dict:
         """
@@ -179,7 +152,7 @@ class GeminiService:
         """
         Analiza el estado agregado de TODAS las sedes y genera un resumen ejecutivo para el C-Level / Jefe de Infraestructura.
         """
-        if not self.client:
+        if not self.model:
             return {
                 "executive_summary": "Resumen no disponible (IA desconectada).",
                 "global_status": "NORMAL",
@@ -207,12 +180,12 @@ class GeminiService:
         }}
         """
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self.model.generate_content(
                 contents=prompt
             )
             import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            clean_text = response.text.replace('```json', '').replace('```', '').strip()
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
             return {"executive_summary": "Error parseando respuesta IA.", "global_status": "WARNING"}
@@ -221,130 +194,70 @@ class GeminiService:
             return {"executive_summary": "Error en servicio de IA.", "global_status": "WARNING"}
 
     async def get_chat_response(self, message: str, context: dict, profile_type: str = "residential") -> dict:
-        """
-        Maneja una conversación fluida con el usuario inyectando contexto técnico.
-        """
-        if not self.client:
+        if not self.model:
             return {"response": "Lo siento, el servicio de IA no está configurado."}
 
+        # MODO ECCO IA: Crítico, Sincero y Conciso
         prompt = f"""
-        Eres el asistente inteligente de Ecco-IA para el sector Residencial.
-        Tu objetivo es ayudar al usuario a entender sus datos de energía y proponer ahorros.
+        SISTEMA DE AUDITORÍA ENERGÉTICA UPTC - NÚCLEO ECCO IA
         
-        CONTEXTO ACTUAL DEL USUARIO:
-        {json.dumps(context, indent=2)}
+        INFORMACIÓN DISPONIBLE:
+        {json.dumps(context, indent=2, default=str)}
         
-        MENSAJE DEL USUARIO:
+        REGLAS DE ORO (ESTRICTO):
+        1. BREVEDAD: Se extremadamente conciso. Si el usuario solo saluda, responde con un saludo breve.
+        2. INTENCIONALIDAD: Solo analiza los datos del JSON si el usuario hace una pregunta técnica o pide un desglose. No escupas todo el reporte por defecto.
+        3. SINCERIDAD CRÍTICA: Cuando analices, sé directo y crítico. Cero lenguaje de marketing.
+        4. NO HABLES DE LA "COCINA": Prohibido mencionar modelos, pkl, xgboost, etc. Todo es conocimiento de ECCO IA.
+        5. IDENTIDAD: Empieza con "ECCO IA:".
+        
+        PREGUNTA DEL USUARIO:
         {message}
         
-        INSTRUCCIONES:
-        1. Sé profesional pero cercano.
-        2. Si el usuario pregunta cosas técnicas, usa el contexto proporcionado (estrato, equipos, consumos).
-        3. Habla de 'vampiros energéticos' y electrodomésticos.
-        4. Responde en español.
-        
         RESPUESTA (JSON):
-        {{ "response": "tu respuesta aquí" }}
+        {{ "response": "[Tu respuesta concisa aquí]" }}
         """
-        
+
         try:
-            # Asegurar que el cliente existe
-            if not self.client:
-                logger.warning("Gemini Client not initialized. Returning fallback.")
-                return {"response": "El servicio de IA no está disponible en este momento."}
-
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
+            response = self.model.generate_content(prompt)
+            clean_text = response.text.replace('```json', '').replace('```', '').strip()
             
-            # Verificar si la respuesta es válida antes de procesar
-            if not response:
-                logger.error("Gemini returned empty response")
-                return {"response": "No recibí respuesta del servidor de IA."}
-
             import re
-            # Intento robusto de extraer JSON
-            clean_text = response.text.strip()
-            # Si tiene markdown code blocks ```json ... ```, extraerlos
-            json_match = re.search(r'```json\s*(.*?)\s*```', clean_text, re.DOTALL)
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             if json_match:
-                clean_text = json_match.group(1)
-            else:
-                # Intentar buscar el primer { y último }
-                json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
-                if json_match:
-                    clean_text = json_match.group(0)
-
-            try:
-                return json.loads(clean_text)
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse JSON from Gemini: {clean_text[:100]}...")
-                # Fallback: devolver texto plano si es lo que hay
-                if "response" not in clean_text:
-                     return {"response": response.text}
-                return {"response": "Error procesando respuesta de la IA."}
+                return json.loads(json_match.group(0))
+            return {"response": clean_text}
 
         except Exception as e:
-            logger.error(f"CRITICAL Error in Gemini Chat: {str(e)}", exc_info=True)
-            return {"response": "Ocurrió un error interno al conectar con la IA. Por favor intenta más tarde."}
+            err_msg = str(e)
+            if "429" in err_msg or "quota" in err_msg.lower():
+                return {"response": "⚠️ ECCO IA: Se ha alcanzado el límite de consultas gratuitas de Google Gemini. Por favor, espera un minuto para la siguiente auditoría crítica."}
+            logger.error(f"Error in Gemini Chat: {e}")
+            return {"response": "Analítica Crítica ECCO IA: Error técnico procesando los modelos. Reintenta."}
 
     async def get_sector_recommendations(self, sector_analysis: dict, anomalies: dict, campus_name: str) -> dict:
-        """
-        Genera recomendaciones ESPECÍFICAS y ACCIONABLES por sector.
-        Objetivo 3: Traducir predicciones y análisis en acciones concretas.
-        """
-        if not self.client:
-            return self._generate_fallback_sector_recommendations(sector_analysis, anomalies)
+        if not self.model:
+             return self._generate_fallback_sector_recommendations(sector_analysis, anomalies)
 
         prompt = f"""
-        Rol: Ingeniero Senior de Eficiencia Energética especializado en Infraestructura Universitaria.
-        Misión: Generar recomendaciones ESPECÍFICAS, MEDIBLES y ACCIONABLES para cada sector ineficiente.
+        Rol: Ingeniero de Eficiencia Energética UPTC.
+        Sede: {campus_name}
         
-        SEDE ANALIZADA: {campus_name}
-        
-        ANÁLISIS DE EFICIENCIA POR SECTOR:
+        Análisis:
         {json.dumps(sector_analysis, indent=2, default=str)}
         
-        ANOMALÍAS DETECTADAS:
-        {json.dumps(anomalies, indent=2, default=str)}
-        
-        INSTRUCCIONES CRÍTICAS:
-        1. Para CADA sector ineficiente, genera UNA recomendación específica.
-        2. Cada recomendación DEBE incluir:
-           - Acción concreta (qué hacer exactamente)
-           - Responsable sugerido (Facility Management, Mantenimiento, etc.)
-           - Plazo recomendado (Inmediato, 1 semana, 1 mes)
-           - Ahorro estimado en % o kWh
-        3. Prioriza acciones de BAJO COSTO y ALTO IMPACTO.
-        4. Si hay consumo fuera de horario, incluye recomendación de automatización.
-        5. Usa lenguaje técnico pero comprensible.
-        
-        FORMATO DE SALIDA (JSON ESTRICTO):
+        Genera recomendaciones JSON:
         {{
-            "sector_recommendations": [
-                {{
-                    "sector": "Nombre del sector",
-                    "problema": "Descripción técnica del problema",
-                    "accion": "Acción específica a tomar",
-                    "responsable": "Área responsable",
-                    "plazo": "Inmediato/Corto/Mediano",
-                    "ahorro_estimado": "X% o X kWh/mes",
-                    "inversion_requerida": "Baja/Media/Alta",
-                    "roi_estimado": "X meses"
-                }}
-            ],
-            "quick_wins": ["Acción inmediata 1", "Acción inmediata 2"],
-            "resumen_ejecutivo": "Frase resumen para gerencia"
+            "sector_recommendations": [],
+            "quick_wins": [],
+            "resumen_ejecutivo": "..."
         }}
         """
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
+            response = self.model.generate_content(prompt)
+            clean_text = response.text.replace('```json', '').replace('```', '')
             import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
             return {"sector_recommendations": [], "quick_wins": [], "resumen_ejecutivo": response.text[:200]}
@@ -353,7 +266,7 @@ class GeminiService:
             return self._generate_fallback_sector_recommendations(sector_analysis, anomalies)
 
     def _generate_fallback_sector_recommendations(self, sector_analysis: dict, anomalies: dict) -> dict:
-        """Fallback cuando Gemini no está disponible."""
+        """Fallback simple"""
         recommendations = []
         
         inefficient = sector_analysis.get("inefficient_sectors", [])
@@ -393,13 +306,13 @@ class GeminiService:
             ],
             "resumen_ejecutivo": f"Se identificaron {len(inefficient)} sectores con oportunidad de mejora. Potencial de ahorro estimado: 15-25%."
         }
-
+        
     async def explain_model_decision(self, prediction: float, features: dict, shap_values: list = None) -> dict:
         """
         Objetivo 4: Explica las decisiones del modelo en lenguaje natural.
         Traduce valores SHAP o features importantes a explicaciones comprensibles.
         """
-        if not self.client:
+        if not self.model:
             return self._generate_fallback_explanation(prediction, features)
 
         prompt = f"""
@@ -430,12 +343,12 @@ class GeminiService:
         }}
         """
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self.model.generate_content(
                 contents=prompt
             )
             import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            clean_text = response.text.replace('```json', '').replace('```', '').strip()
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
             return {"explicacion_principal": response.text[:300]}
