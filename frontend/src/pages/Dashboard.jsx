@@ -19,42 +19,56 @@ const DEMO_CAMPUSES = [
   { id: 4, name: 'Sede Chiquinquirá', location_city: 'Chiquinquirá', baseline_energy_kwh: 5400, status: 'maintenance' },
 ];
 
-const SystemStatus = ({ status = "ONLINE", color = "emerald" }) => (
-  <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-${color}-500/10 border border-${color}-500/20 shadow-[0_0_10px_rgba(0,0,0,0.2)]`}>
-    <div className={`w-2 h-2 rounded-full bg-${color}-500 animate-pulse shadow-[0_0_8px_currentColor]`} />
-    <span className={`text-[10px] font-mono font-bold text-${color}-400 tracking-widest`}>
-      SYSTEM_{status}
-    </span>
-  </div>
-);
+const COLOR_MAP = {
+  emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', hoverBorder: 'hover-border-emerald-500/50', iconBg: 'bg-emerald-500/10', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]' },
+  amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', hoverBorder: 'hover-border-amber-500/50', iconBg: 'bg-amber-500/10', glow: 'shadow-[0_0_8px_rgba(245,158,11,0.5)]' },
+  blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', hoverBorder: 'hover-border-blue-500/50', iconBg: 'bg-blue-500/10', glow: 'shadow-[0_0_8px_rgba(59,130,246,0.5)]' },
+  purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', hoverBorder: 'hover-border-purple-500/50', iconBg: 'bg-purple-500/10', glow: 'shadow-[0_0_8px_rgba(168,85,247,0.5)]' },
+  red: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400', hoverBorder: 'hover-border-red-500/50', iconBg: 'bg-red-500/10', glow: 'shadow-[0_0_8px_rgba(239,68,68,0.5)]' },
+};
 
-const GlobalMetric = ({ title, value, unit, icon: Icon, color, trend }) => (
-  <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-[#0a0f1e] to-slate-900 border border-${color}-500/20 p-6 group hover:border-${color}-500/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(var(--color-${color}),0.1)]`}>
-    {/* Abstract Background Effect */}
-    <div className={`absolute -right-6 -top-6 w-24 h-24 bg-${color}-500/10 rounded-full blur-2xl group-hover:bg-${color}-500/20 transition-all`} />
+const SystemStatus = ({ status = "ONLINE", color = "emerald" }) => {
+  const theme = COLOR_MAP[color] || COLOR_MAP.emerald;
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${theme.bg} ${theme.border} border shadow-[0_0_10px_rgba(0,0,0,0.2)]`}>
+      <div className={`w-2 h-2 rounded-full bg-${color}-500 animate-pulse ${theme.glow}`} />
+      <span className={`text-[10px] font-mono font-bold ${theme.text} tracking-widest`}>
+        SYSTEM_{status}
+      </span>
+    </div>
+  );
+};
 
-    <div className="relative z-10 flex flex-col justify-between h-full">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-lg bg-${color}-500/10 border border-${color}-500/20 text-${color}-400`}>
-          <Icon size={24} />
+const GlobalMetric = ({ title, value, unit, icon: Icon, color, trend }) => {
+  const theme = COLOR_MAP[color] || COLOR_MAP.emerald;
+  return (
+    <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-[#0a0f1e] to-slate-900 border ${theme.border} p-6 group hover:border-opacity-50 transition-all duration-300 hover:shadow-lg`}>
+      {/* Abstract Background Effect */}
+      <div className={`absolute -right-6 -top-6 w-24 h-24 ${theme.bg} rounded-full blur-2xl opacity-50 group-hover:opacity-100 transition-all`} />
+
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        <div className="flex justify-between items-start mb-4">
+          <div className={`p-3 rounded-lg ${theme.iconBg} border ${theme.border} ${theme.text}`}>
+            <Icon size={24} />
+          </div>
+          {trend && (
+            <span className={`text-xs font-bold font-mono py-1 px-2 rounded bg-white/5 ${trend > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {trend > 0 ? '+' : ''}{trend}%
+            </span>
+          )}
         </div>
-        {trend && (
-          <span className={`text-xs font-bold font-mono py-1 px-2 rounded bg-white/5 ${trend > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {trend > 0 ? '+' : ''}{trend}%
-          </span>
-        )}
-      </div>
 
-      <div>
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 opacity-80">{title}</h3>
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-white font-mono tracking-tighter shadow-black drop-shadow-lg">{value}</span>
-          <span className={`text-xs font-bold text-${color}-500 font-mono`}>{unit}</span>
+        <div>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 opacity-80">{title}</h3>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-white font-mono tracking-tighter shadow-black drop-shadow-lg">{value}</span>
+            <span className={`text-xs font-bold ${theme.text} font-mono`}>{unit}</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const CampusNode = ({ campus, onClick }) => (
   <div
