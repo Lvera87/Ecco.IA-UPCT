@@ -15,6 +15,7 @@ import StatCard from '../components/ui/StatCard';
 import InsightCard from '../components/ui/InsightCard';
 import EmptyState from '../components/ui/EmptyState';
 import GoalsModal from '../components/ui/GoalsModal';
+import CampusSelector from '../components/dashboard/CampusSelector';
 import { useUser } from '../context/UserContext';
 import { useEnergy } from '../context/EnergyContext';
 import { useUI } from '../context/UIContext';
@@ -329,30 +330,37 @@ const InfrastructureAnalytics = () => {
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                         {/* Control Bar */}
-                        <div className="flex justify-end gap-4">
-                            <div className="flex bg-white dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 shadow-sm">
-                                {['week', 'month'].map(period => (
-                                    <button
-                                        key={period}
-                                        onClick={() => setTimeRange(period)}
-                                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all
-                      ${timeRange === period
-                                                ? 'bg-uptc-black text-uptc-gold shadow-md'
-                                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                    >
-                                        {period === 'week' ? 'Semanal' : 'Mensual'}
-                                    </button>
-                                ))}
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Seleccionar Sede</p>
+                                <CampusSelector />
                             </div>
-                            <Button
-                                variant="outline"
-                                size="md"
-                                icon={Download}
-                                className="border-uptc-gold text-uptc-gold hover:bg-uptc-gold hover:text-black"
-                                onClick={handleExport}
-                            >
-                                Exportar
-                            </Button>
+
+                            <div className="flex items-center gap-4">
+                                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                                    {['week', 'month'].map(period => (
+                                        <button
+                                            key={period}
+                                            onClick={() => setTimeRange(period)}
+                                            className={`px-4 py-2 rounded-md text-xs font-bold transition-all
+                                    ${timeRange === period
+                                                    ? 'bg-uptc-black text-uptc-gold shadow-sm'
+                                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                        >
+                                            {period === 'week' ? 'Semanal' : 'Mensual'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="md"
+                                    icon={Download}
+                                    className="border-uptc-gold text-uptc-gold hover:bg-uptc-gold hover:text-black"
+                                    onClick={handleExport}
+                                >
+                                    Exportar
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Stats Grid */}
@@ -403,7 +411,7 @@ const InfrastructureAnalytics = () => {
                                 <div className="h-[300px] w-full min-w-0" style={{ minHeight: '300px' }}>
                                     {isReady && (
                                         <ResponsiveContainer width="100%" height={300}>
-                                            <ComposedChart data={processedData.length > 0 ? processedData : [{ name: 'Lun', consumo: 1200, promedio: 1100 }, { name: 'Mar', consumo: 1350, promedio: 1150 }]}>
+                                            <ComposedChart data={processedData}>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} opacity={0.1} />
                                                 <XAxis
                                                     dataKey="name"

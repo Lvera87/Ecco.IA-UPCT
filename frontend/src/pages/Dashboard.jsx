@@ -52,19 +52,13 @@ const Dashboard = () => {
 
   // Datos para gráficos
   const chartData = useMemo(() => {
-    if (consumptionHistory.length > 0) {
+    if (consumptionHistory && consumptionHistory.length > 0) {
       return consumptionHistory.map(r => ({
-        time: new Date(r.date).toLocaleDateString([], { day: '2-digit', month: 'short' }),
+        time: new Date(r.date).toLocaleDateString([], { day: '2-digit', month: 'short', year: '2-digit' }),
         value: r.value
-      })).reverse();
+      }));
     }
-    // Datos simulados para demo si no hay historial
-    return [
-      { time: 'Lun', value: 4500 }, { time: 'Mar', value: 5200 },
-      { time: 'Mié', value: 4900 }, { time: 'Jue', value: 5100 },
-      { time: 'Vie', value: 5800 }, { time: 'Sáb', value: 2100 },
-      { time: 'Dom', value: 1800 }
-    ];
+    return [];
   }, [consumptionHistory]);
 
   if (isSyncing && !dashboardInsights) {
@@ -214,13 +208,14 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* Gráfico de Consumo Institucional (Refactored) */}
-            <CampusConsumptionChart
-              data={chartData}
-              title="Consumo Energético de Sede"
-              subtitle="Monitoreo en tiempo real de bloques y laboratorios."
-            />
-
+            {/* Gráfico de Consumo Global */}
+            <div className="mt-8">
+              <CampusConsumptionChart
+                data={chartData}
+                title="Histórico de Consumo"
+                subtitle="Tendencia anualizada de la sede controlada"
+              />
+            </div>
 
           </div>
 

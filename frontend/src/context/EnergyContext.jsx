@@ -68,17 +68,28 @@ export const EnergyProvider = ({ children }) => {
                 setConsumptionHistory(historyData);
             }
 
-            // Mocking different metrics per campus since the API might be global
-            // In a real scenario, passing targetId to getDashboardMetrics would be better
-            const metrics = dashboardData?.summary ? {
-                monthly_kwh: dashboardData.summary.monthly_consumption_kwh,
-                carbon_footprint_tons: dashboardData.summary.carbon_footprint_tons,
-                kwh_per_student: 120.5, // Mock
-                water_m3: 3500, // Mock Water Consumption
-                occupancy_rate: targetId === '1' ? 85 : 62, // Mock Occupancy (Tunja busy, others less)
-                efficiency_score: targetId === '2' ? 95 : 85, // Example variation
-                energy_intensity_index: 45.2
-            } : {};
+            // --- REAL DATA CALCULATION ---
+            const currentCampus = currentCampuses.find(c => c.id === targetId);
+            const students = currentCampus?.population_students || 1;
+            const area = currentCampus?.total_area_sqm || 1;
+
+            // Filter by resource type and get last 30 days roughly
+            const electricityRecords = historyData.filter(r => r.unit === 'kWh');
+            const waterRecords = historyData.filter(r => r.unit === 'm3');
+
+            // Sum last 30 records for "Monthly" estimate (assuming daily data)
+            const monthlyKwh = electricityRecords.slice(-30).reduce((acc, curr) => acc + curr.value, 0);
+            const monthlyWater = waterRecords.slice(-30).reduce((acc, curr) => acc + curr.value, 0);
+
+            const metrics = {
+                monthly_kwh: monthlyKwh,
+                carbon_footprint_tons: monthlyKwh * 0.000126, // Conversion factor for Colombia roughly
+                kwh_per_student: parseFloat((monthlyKwh / students).toFixed(2)),
+                water_m3: monthlyWater,
+                occupancy_rate: 85, // This usually requires sensor data not yet in DB, keeping partial mock/estimate
+                efficiency_score: monthlyKwh < (currentCampus?.baseline_energy_kwh * 30) ? 95 : 82, // Compare vs Baseline
+                energy_intensity_index: parseFloat((monthlyKwh / area).toFixed(2))
+            };
 
             if (campusAssets) {
                 setAssets(campusAssets.map(a => ({
@@ -94,7 +105,7 @@ export const EnergyProvider = ({ children }) => {
 
             setDashboardInsights({
                 metrics,
-                ai_advice: `Análisis para sede ${currentCampuses.find(c => c.id === targetId)?.name}: Se observa estabilidad operativa.`
+                ai_advice: `Análisis para sede ${currentCampus?.name}: Consumo ${monthlyKwh > 0 ? 'activo' : 'sin datos recientes'}.`
             });
 
         } catch (error) {

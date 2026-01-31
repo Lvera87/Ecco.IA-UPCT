@@ -186,10 +186,10 @@ async def get_consumption_history(
     campus = result.scalar_one_or_none()
     if not campus: raise HTTPException(status_code=404, detail="Campus not found")
 
-    # Fetch real records from DB
+    # Fetch real records from DB (All history)
     query = select(ConsumptionRecord).where(
         ConsumptionRecord.campus_id == campus_id
-    ).order_by(ConsumptionRecord.reading_date.desc()).limit(30)
+    ).order_by(ConsumptionRecord.reading_date.asc())
     
     result = await db.execute(query)
     db_records = result.scalars().all()
@@ -207,5 +207,5 @@ async def get_consumption_history(
             "unit": "kWh" if r.resource_type == 'electricity' else 'm3'
         })
     
-    # Reverse to show chronological order (oldest -> newest) for charts usually
-    return records[::-1]
+    # Return in chronological order
+    return records
