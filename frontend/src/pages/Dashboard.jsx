@@ -118,51 +118,105 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState({ totalEnergy: 0, activeAlerts: 0, efficiency: 0 });
 
+  // Estado para la gráfica agregada real
+  const [globalChartData, setGlobalChartData] = useState([]);
+
   useEffect(() => {
-    const fetchGlobal = async () => {
+    const fetchGlobalData = async () => {
       try {
-        const data = await campusApi.getAll();
-        if (data && data.length > 0) {
-          setCampuses(data);
-          // Basic calculations if real data
-          const total = data.reduce((acc, c) => acc + (c.baseline_energy_kwh || 0), 0);
-          setMetrics({
-            totalEnergy: total,
-            activeAlerts: 2, // Mocked for now
-            efficiency: 92.4
-          });
+        // 1. Obtener Sedes
+        const campusesData = await campusApi.getAll();
+
+        let validCampuses = [];
+        if (campusesData && campusesData.length > 0) {
+          validCampuses = campusesData;
         } else {
           console.warn("API returned empty, using fallback demo data");
-          setCampuses(DEMO_CAMPUSES);
-          // Demo calculations
-          const total = DEMO_CAMPUSES.reduce((acc, c) => acc + (c.baseline_energy_kwh || 0), 0);
-          setMetrics({
-            totalEnergy: total,
-            activeAlerts: 1,
-            efficiency: 88.5
-          });
+          validCampuses = DEMO_CAMPUSES;
         }
+        setCampuses(validCampuses);
+
+        // 2. Obtener Predicciones de CADA sede para agregar
+        // Esto le da valor real a la gráfica: es la SUMA de los modelos Prophet
+        const predictionsPromises = validCampuses.map(c =>
+          campusApi.getPredictions(c.id, 7).catch(e => {
+            console.error(`Error fetching predictions for campus ${c.id}:`, e);
+            return null; // Return null for failed predictions
+          })
+        );
+
+        const allPredictions = await Promise.all(predictionsPromises);
+
+        // 3. Agregar Datos (Sumar día a día)
+        const aggregatedMap = {}; // { "MM-DD": { value: 0, date: "..." } }
+
+        allPredictions.forEach((pred, index) => {
+          if (pred && pred.forecast) {
+            pred.forecast.dates.forEach((date, i) => {
+              const shortDate = date.substring(5); // MM-DD
+              if (!aggregatedMap[shortDate]) {
+                aggregatedMap[shortDate] = { time: shortDate, value: 0, fullDate: date };
+              }
+              // Sumamos la predicción de esta sede
+              aggregatedMap[shortDate].value += (pred.forecast.predictions[i] || 0);
+            });
+          } else {
+            // Si falla el modelo para una sede, usamos fallback (basal) para no romper la suma
+            // Fallback inteligente: Usar baseline / 7 días
+            const textDate = new Date();
+            for (let k = 0; k < 7; k++) {
+              const d = new Date();
+              d.setDate(d.getDate() + k);
+              const key = d.toISOString().split('T')[0].substring(5);
+              if (!aggregatedMap[key]) aggregatedMap[key] = { time: key, value: 0 };
+              // Add baseline daily estimate
+              aggregatedMap[key].value += ((validCampuses[index].baseline_energy_kwh || 10000) / 30);
+            }
+          }
+        });
+
+        // Convertir a array y ordenar
+        const aggregatedChart = Object.values(aggregatedMap)
+          .sort((a, b) => a.time.localeCompare(b.time))
+          .map(item => ({ ...item, value: Math.round(item.value) }));
+
+        setGlobalChartData(aggregatedChart);
+
+        // Calcular métricas totales basadas en la proyección real
+        const totalProjected = aggregatedChart.reduce((acc, curr) => acc + curr.value, 0);
+
+        setMetrics({
+          totalEnergy: totalProjected,
+          activeAlerts: 2,
+          efficiency: 92.4
+        });
+
       } catch (e) {
         console.error("Dashboard error:", e);
-        setCampuses(DEMO_CAMPUSES); // Fail-safe
+        setCampuses(DEMO_CAMPUSES);
+        // Fallback for chart data if API fails completely
         const total = DEMO_CAMPUSES.reduce((acc, c) => acc + (c.baseline_energy_kwh || 0), 0);
         setMetrics({
           totalEnergy: total,
           activeAlerts: 1,
           efficiency: 88.5
         });
+        // Mock global aggregate chart data with more movement
+        const demoGlobalChartData = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() + i);
+          return {
+            time: d.toISOString().split('T')[0].substring(5),
+            value: Math.floor(Math.random() * 3000) + 8000 + (Math.sin(i / 3) * 2000)
+          };
+        });
+        setGlobalChartData(demoGlobalChartData);
       } finally {
         setLoading(false);
       }
     };
-    fetchGlobal();
+    fetchGlobalData();
   }, []);
-
-  // Mock global aggregate chart data with more movement
-  const globalChartData = Array.from({ length: 24 }, (_, i) => ({
-    time: `${i}:00`,
-    value: Math.floor(Math.random() * 3000) + 8000 + (Math.sin(i / 3) * 2000)
-  }));
 
   if (loading) return (
     <div className="min-h-screen bg-[#02040a] flex flex-col items-center justify-center text-blue-500 font-mono gap-4">
