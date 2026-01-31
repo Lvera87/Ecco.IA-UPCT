@@ -248,18 +248,46 @@ class GeminiService:
         """
         
         try:
+            # Asegurar que el cliente existe
+            if not self.client:
+                logger.warning("Gemini Client not initialized. Returning fallback.")
+                return {"response": "El servicio de IA no está disponible en este momento."}
+
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt
             )
+            
+            # Verificar si la respuesta es válida antes de procesar
+            if not response:
+                logger.error("Gemini returned empty response")
+                return {"response": "No recibí respuesta del servidor de IA."}
+
             import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            # Intento robusto de extraer JSON
+            clean_text = response.text.strip()
+            # Si tiene markdown code blocks ```json ... ```, extraerlos
+            json_match = re.search(r'```json\s*(.*?)\s*```', clean_text, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(0))
-            return {"response": response.text}
+                clean_text = json_match.group(1)
+            else:
+                # Intentar buscar el primer { y último }
+                json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+                if json_match:
+                    clean_text = json_match.group(0)
+
+            try:
+                return json.loads(clean_text)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse JSON from Gemini: {clean_text[:100]}...")
+                # Fallback: devolver texto plano si es lo que hay
+                if "response" not in clean_text:
+                     return {"response": response.text}
+                return {"response": "Error procesando respuesta de la IA."}
+
         except Exception as e:
-            logger.error(f"Error in Gemini Chat: {e}")
-            return {"response": "Tuve un pequeño corto circuito mental. ¿Podrías repetir la pregunta?"}
+            logger.error(f"CRITICAL Error in Gemini Chat: {str(e)}", exc_info=True)
+            return {"response": "Ocurrió un error interno al conectar con la IA. Por favor intenta más tarde."}
 
     async def get_sector_recommendations(self, sector_analysis: dict, anomalies: dict, campus_name: str) -> dict:
         """

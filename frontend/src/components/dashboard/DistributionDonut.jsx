@@ -15,8 +15,8 @@ const DistributionDonut = () => {
       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 w-full text-left px-4">
         Distribución por Sector
       </h3>
-      
-      <div className="w-full h-[200px] relative">
+
+      <div className="w-full h-[200px] relative min-w-[200px] min-h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -33,13 +33,13 @@ const DistributionDonut = () => {
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip 
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
-                itemStyle={{ color: '#fff' }}
+            <Tooltip
+              contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
+              itemStyle={{ color: '#fff' }}
             />
           </PieChart>
         </ResponsiveContainer>
-        
+
         {/* Texto Central */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
